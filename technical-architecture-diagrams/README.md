@@ -6,13 +6,13 @@ Three diagrams of the system: the overall concept, how information travels and i
 
 | Diagram | File |
 |---|---|
-| 1. System concept: three zones | [system-concept.png](system-concept.png) |
-| 2. Communication and persistent spatial memory | [communication-architecture.png](communication-architecture.png) |
-| 3. Distributed Wi-Fi CSI victim-presence sensing | [csi-sensing.png](csi-sensing.png) |
+| 1. System concept: three zones | [system-concept.jpg](system-concept.jpg) |
+| 2. Communication and persistent spatial memory | [communication-architecture.jpg](communication-architecture.jpg) |
+| 3. Distributed Wi-Fi CSI victim-presence sensing | [csi-sensing.jpg](csi-sensing.jpg) |
 
 ## 1. System concept: three zones
 
-![System concept: the GPS-denied mine, the Outside Network Area and the outside world](system-concept.png)
+![System concept: the GPS-denied mine, the Outside Network Area and the outside world](system-concept.jpg)
 
 - **Left zone: the mine, disconnected and without GPS.** The slow **Writer** robot explores the tunnels and leaves a trail of radio beacons behind it. Along the way it records events, such as a hazard or a victim. The **fast Writer** (a drone) looks for victims quickly. The **Executor** robot later follows the stored trail to the victim.
 - **Boundary: the Outside Network Area.** The **first beacon** of each entrance is the only gateway: all communication between the inside and the outside passes through it. A station with antennas links it to the outside.
@@ -20,7 +20,7 @@ Three diagrams of the system: the overall concept, how information travels and i
 
 ## 2. Communication and persistent spatial memory
 
-![Communication and persistent spatial memory architecture](communication-architecture.png)
+![Communication and persistent spatial memory architecture](communication-architecture.jpg)
 
 - **Inside the mine,** the Writer sends spatial and event data to the nearest beacon over **ESP-NOW**. Beacons forward it hop by hop, so every record is stored in the beacons and survives even if the Writer fails.
 - **Optical fibre** connects the entrance beacon to its **Outside Network station**. Each station has a computer, antennas or parabolic dishes, solar panels with a battery, and robot charging.
@@ -29,7 +29,7 @@ Three diagrams of the system: the overall concept, how information travels and i
 
 ## 3. Distributed Wi-Fi CSI victim-presence sensing
 
-![Distributed Wi-Fi CSI victim-presence sensing](csi-sensing.png)
+![Distributed Wi-Fi CSI victim-presence sensing](csi-sensing.jpg)
 
 - **Wi-Fi sources inside the mine:** the Writer and the beacons emit Wi-Fi, without any outside connection.
 - **ESP32-S3 CSI nodes** spread around the area measure the Wi-Fi channel. A person changes it by being there, breathing or moving.
