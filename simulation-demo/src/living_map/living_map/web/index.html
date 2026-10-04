@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Living Map — Dataflow</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232321;
+  --surface-3: #2d2d2a;
+  --line: #3a3a36;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8d8c84;
+  /* entities: the first three categorical slots (validated all-pairs, dark).
+     Flix A/B share the scout hue and are told apart by their ID colour + label. */
+  --executor: #3987e5;
+  --writer: #d95926;
+  --scout: #199e70;
+  /* status palette (reserved, always with icon + label) */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --relay: #c3c2b7;
+  --outside: #1d2733;
+  --rock: #161514;
+  --floor: #2c2a26;
+  --water: #16384a;
+  --fiber: #e8a14f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text-primary);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Ubuntu, sans-serif;
+  display: grid; grid-template-rows: auto minmax(320px, 1fr) auto minmax(200px, 30vh);
+  gap: 8px; padding: 8px; overflow: hidden;
+}
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+h1 { font-size: 15px; margin: 0; letter-spacing: .02em; font-weight: 650; }
+h1 small { color: var(--text-muted); font-weight: 500; }
+.chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 10px; color: var(--text-secondary); white-space: nowrap; }
+.chip b { color: var(--text-primary); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg button { background: var(--surface-2); color: var(--text-secondary); border: 0; padding: 2px 10px;
+  font: inherit; font-size: 12px; cursor: pointer; }
+.seg button.on { background: #1d2a3a; color: var(--text-primary); }
+#scenarioText { flex-basis: 100%; color: var(--text-secondary); font-size: 12px; }
+#done { flex-basis: 100%; display: none; border: 2px solid var(--good); border-radius: 6px;
+  background: #13261a; padding: 6px 12px; }
+#done.on { display: block; }
+#done b.big { color: var(--good); font-size: 15px; letter-spacing: .04em; margin-right: 10px; }
+#done span { color: var(--text-secondary); margin-right: 14px; white-space: nowrap; }
+#done span b { color: var(--text-primary); }
+#done .end { display: block; margin-top: 2px; color: var(--text-primary); }
+.steps { display: flex; gap: 4px; flex-wrap: wrap; }
+.step { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--surface-2);
+  color: var(--text-muted); border: 1px solid transparent; }
+.step.done { color: var(--text-secondary); }
+.step.done::before { content: "✓ "; color: var(--good); }
+.step.now { color: var(--text-primary); border-color: var(--executor); background: #1d2a3a; }
+.panel { background: var(--surface-1); border: 1px solid var(--line); border-radius: 8px;
+  position: relative; min-height: 0; overflow: hidden; }
+.ptitle { position: absolute; left: 10px; top: 6px; font-size: 11px; font-weight: 650;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); z-index: 2;
+  pointer-events: none; }
+#mapPanel canvas#map { display: block; width: 100%; height: 100%; }
+#legend { position: absolute; right: 8px; top: 6px; display: flex; flex-wrap: wrap; gap: 4px 10px;
+  justify-content: flex-end; max-width: 72%; font-size: 11px; color: var(--text-secondary);
+  z-index: 2; pointer-events: none; }
+#legend span { display: inline-flex; align-items: center; gap: 4px; }
+#legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+#legend i.tri { border-radius: 0; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+#legend i.ring { background: transparent !important; border: 2px solid var(--text-secondary); }
+#legend i.dia { border-radius: 0; transform: rotate(45deg) scale(.8); }
+#tip { position: absolute; pointer-events: none; background: var(--surface-3); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; display: none; z-index: 5; max-width: 280px; }
+#note { position: absolute; left: 10px; bottom: 6px; font-size: 11px; color: var(--text-muted); z-index: 2; }
+#scale { position: absolute; right: 10px; bottom: 6px; font-size: 11px; color: var(--text-muted); z-index: 2; }
+
+/* pipeline */
+#pipe { padding: 24px 10px 8px; }
+.lane { display: grid; grid-template-columns: 1fr 22px 1.45fr 22px 0.8fr 22px 1.25fr; align-items: stretch; }
+.card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+  min-height: 54px; min-width: 0; transition: border-color .3s, box-shadow .3s; }
+.card h3 { margin: 0 0 2px; font-size: 12px; font-weight: 650; }
+.card .sub { color: var(--text-muted); font-size: 11px; }
+.card .val { color: var(--text-secondary); font-size: 11.5px; font-family: ui-monospace, "DejaVu Sans Mono", monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.flash { border-color: var(--text-secondary); box-shadow: 0 0 0 2px #ffffff22; }
+.conn { position: relative; }
+.conn::before { content: ""; position: absolute; left: 2px; right: 2px; top: 50%; border-top: 2px dashed var(--line); }
+.pdot { position: absolute; width: 10px; height: 10px; border-radius: 50%; margin: -5px 0 0 -5px;
+  z-index: 4; box-shadow: 0 0 0 2px var(--surface-1); pointer-events: none; }
+
+/* bottom */
+#bottom { display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px; min-height: 0; }
+#bottom .panel { padding: 24px 10px 8px; overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11px; padding: 2px 4px;
+  border-bottom: 1px solid var(--line); }
+td { padding: 3px 4px; border-bottom: 1px solid #2a2a27; color: var(--text-secondary); vertical-align: top; }
+td.mono { white-space: nowrap; }
+td.mono, .mono { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 11.5px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.st { display: inline-flex; gap: 4px; align-items: center; font-weight: 600; font-size: 11px;
+  padding: 1px 6px; border-radius: 4px; background: var(--surface-3); color: var(--text-primary); white-space: nowrap; }
+.st .ic { font-size: 11px; }
+.st.rep .ic { color: var(--warning); }
+.st.ok .ic { color: var(--good); }
+.st.bad .ic { color: var(--critical); }
+.st.fp .ic { color: var(--text-muted); }
+.st.fp { color: var(--text-secondary); background: #262624; }
+.sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.brief { background: #1d2a3a; border: 1px solid #2c4a72; border-radius: 6px; padding: 6px 8px; margin: 6px 0;
+  font-size: 12px; color: var(--text-secondary); }
+.brief b { color: var(--text-primary); }
+.hex { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0 6px; }
+.hex span { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 12px; padding: 2px 4px;
+  border-radius: 3px; background: var(--surface-3); color: var(--text-primary); }
+.hex span:nth-child(even) { background: #34342f; }
+.log { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12px; }
+.log li { padding: 2px 0; border-bottom: 1px solid #262624; color: var(--text-secondary); }
+.log li .t { color: var(--text-muted); font-family: ui-monospace, monospace; font-size: 11px; margin-right: 6px; }
+.log li.alert::before { content: "⚠ "; color: var(--warning); }
+.log li.ok::before { content: "✓ "; color: var(--good); }
+.sect { margin-top: 10px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+#conn { font-size: 11px; }
+#caption { position: absolute; left: 10px; right: 300px; bottom: 26px; z-index: 3; pointer-events: none;
+  font-size: 12.5px; color: var(--text-primary); text-shadow: 0 1px 2px #000; }
+#caption small { display: block; color: var(--text-secondary); font-size: 11px; }
+#profile { position: absolute; right: 10px; bottom: 24px; width: 280px; height: 112px; z-index: 3;
+  background: #10181ecc; border: 1px solid var(--line); border-radius: 6px; display: none; }
+.onas { display: flex; gap: 4px; margin-top: 3px; }
+.onas span { font-size: 10.5px; padding: 1px 5px; border-radius: 3px; background: var(--surface-3);
+  color: var(--text-secondary); border: 1px solid transparent; transition: border-color .3s; }
+.onas span.flash { border-color: var(--text-secondary); color: var(--text-primary); }
+.grp { font-size: 10.5px; color: var(--text-muted); }
+.hex span.g0 { background: #2b2f3a; } .hex span.g1 { background: #2e3527; } .hex span.g2 { background: #3a2a2a; }
+.hex span.g3 { background: #24333a; } .hex span.g4 { background: #33302a; }
+.pr { display: inline-block; min-width: 34px; text-align: center; font-weight: 700; font-size: 11px;
+  border-radius: 3px; padding: 0 4px; color: #111; }
+.pr.p1 { background: var(--critical); color: #fff; } .pr.p2 { background: var(--warning); }
+.pr.p3 { background: #8d8c84; } .pr.p0 { background: var(--surface-3); color: var(--text-secondary); }
+.bar { display: inline-block; width: 46px; height: 7px; border-radius: 2px; background: var(--surface-3);
+  vertical-align: 1px; margin-right: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.loop { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 2px; }
+.loop span { font-size: 10px; padding: 0 4px; border-radius: 3px; background: var(--surface-3); color: var(--text-muted); }
+.loop span.on { background: #1d2a3a; color: var(--text-primary); }
+.lesson { font-size: 12px; color: var(--text-secondary); padding: 2px 0; border-bottom: 1px solid #262624; }
+.lesson::before { content: "◆ "; color: var(--scout); }
+#conn.off { color: var(--critical); }
+@media (min-width: 1500px) {
+  body { grid-template-columns: 1.35fr 1fr; grid-template-rows: auto auto minmax(0, 1fr); }
+  header { grid-column: 1 / -1; }
+  #mapPanel { grid-row: 2 / 4; }
+  #pipe { grid-column: 2; grid-row: 2; }
+  #bottom { grid-column: 2; grid-row: 3; grid-template-columns: 1fr; grid-template-rows: 1.25fr 1fr; }
+}
+@media (max-width: 760px) {
+  #bottom { grid-template-columns: 1fr; }
+  .lane { grid-template-columns: 1fr 14px 1fr 14px 1fr 14px 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>THE LIVING MAP <small>· 2D dataflow</small></h1>
+  <span class="chip">scenario <b id="scn">…</b></span>
+  <span class="chip">sim time <b id="simt">0.0 s</b></span>
+  <span class="chip">3D camera <b id="cam">intro</b></span>
+  <span class="seg" id="viewSeg" title="2D view: follow what the 3D camera shows, or the whole site">
+    <button data-v="auto" class="on">Follow camera</button><button data-v="site">Whole site</button></span>
+  <div class="steps" id="steps"></div>
+  <span id="conn" class="chip">connecting…</span>
+  <div id="scenarioText"></div>
+  <div id="done" role="status"></div>
+</header>
+
+<section class="panel" id="mapPanel">
+  <div class="ptitle" id="mapTitle">Mine site · top view (GPS only outside)</div>
+  <div id="legend">
+    <span><i class="tri" style="background:var(--writer)"></i>Writers A/B (X2)</span>
+    <span><i class="tri" style="background:var(--executor)"></i>Executor (X1)</span>
+    <span><i style="background:var(--scout)"></i>Flix A/B ✕</span>
+    <span><i class="ring"></i>on-board estimate (filled = true pose)</span>
+    <span><i style="background:var(--relay)"></i>Relay</span>
+    <span><i style="background:#8c59f2"></i>Junction (DFS table)</span>
+    <span><i style="background:var(--critical)"></i>✚ Victim hypothesis (conf.)</span>
+    <span><i class="dia" style="background:#1fc8dc"></i>Wi-Fi CSI node · link · presence region</span>
+    <span><i style="background:var(--warning)"></i>⚠ Hazard (gas)</span>
+    <span><i style="background:#e05a5a;border-radius:0;height:2px"></i>where to go (toward miner)</span>
+  </div>
+  <canvas id="map"></canvas>
+  <div id="tip"></div>
+  <div id="caption"></div>
+  <canvas id="profile"></canvas>
+  <div id="note">Radio hops slowed ×100 for visibility (ESP-NOW ≈ 3 ms). Wi-Fi CSI classification window 2 s.</div>
+  <div id="scale"></div>
+</section>
+
+<section class="panel" id="pipe">
+  <div class="ptitle">Outside world · the only bridge</div>
+  <div class="lane" id="lane">
+    <div class="card" id="cE"><h3>Mine edge</h3><div class="sub">first beacon of each entrance (A, B: Writers · C: ONA crew) · fibre →</div>
+      <div class="val" id="vE">—</div></div>
+    <div class="conn"></div>
+    <div class="card" id="cONA"><h3>Outside Network Area stations</h3><div class="sub">computer + parabolic antenna · solar + battery · decode 32 B · frame → GPS</div>
+      <div class="onas"><span id="onaA">ONA-A</span><span id="onaB">ONA-B</span><span id="onaC">ONA-C</span></div>
+      <div class="val" id="vONA1">anchor: site survey</div><div class="val" id="vONA2">—</div><div class="val" id="vONA3">energy: —</div></div>
+    <div class="conn"></div>
+    <div class="card" id="cSAT"><h3>Relay satellite</h3><div class="sub">GEO · ~0.6 s/leg · LTE backup</div>
+      <div class="val" id="vSAT">idle</div></div>
+    <div class="conn"></div>
+    <div class="card" id="cCP"><h3>Server + Command Post</h3><div class="sub">mission memory · detection fusion · briefings</div>
+      <div class="val" id="vCP">standby</div></div>
+  </div>
+</section>
+
+<section id="bottom">
+  <div class="panel" id="cpPanel">
+    <div class="ptitle">Command post · victim hypotheses (camera + Wi-Fi CSI fused) and hazards (GPS)</div>
+    <table><thead><tr><th>Hypothesis</th><th>Evidence (detection source · confidence)</th><th>Fused</th><th>GPS (lat, lon, alt)</th><th>Age</th><th>Status</th></tr></thead>
+      <tbody id="events"><tr><td colspan="6">no events yet</td></tr></tbody></table>
+    <div id="briefing"></div>
+    <div class="sect">Hillside survey (Flix A + Flix B, no prior list)</div>
+    <table><thead><tr><th>Opening</th><th>Found by</th><th>State</th><th>Decision</th></tr></thead>
+      <tbody id="entr"><tr><td colspan="4">sweep in progress</td></tr></tbody></table>
+    <div class="sect">Writers · frontier exploration (modified DFS + utility function)</div>
+    <table><thead><tr><th>Writer</th><th>Status · exploration loop</th><th class="num">Beacons / CSI left</th><th class="num">Explored · battery</th><th>Last frontier evaluation (U = gain + relevance − distance − energy + access)</th></tr></thead>
+      <tbody id="dfs"></tbody></table>
+    <div class="sect">Mission server · lessons learned (all ONAs)</div>
+    <div id="lessons"></div>
+    <div class="sect">Robots · position estimate vs simulator truth</div>
+    <table><thead><tr><th>Robot</th><th>Status</th><th class="num">Error</th><th class="num">±σ</th><th class="num">Battery</th><th>Fused sensors</th></tr></thead>
+      <tbody id="robots"></tbody></table>
+    <div class="sect">Mission log</div>
+    <ul class="log" id="log"></ul>
+  </div>
+  <div class="panel" id="pktPanel">
+    <div class="ptitle">Packet inspector · last beacon message (32 bytes)</div>
+    <div id="pktHead" class="mono" style="color:var(--text-secondary)">waiting for first packet…</div>
+    <div class="hex" id="hex"></div>
+    <table><thead><tr><th>Field</th><th>Bytes</th><th>Raw</th><th>Value</th></tr></thead><tbody id="fields"></tbody></table>
+    <div class="sect">Wi-Fi CSI presence sensing (ESP32-S3 nodes → aggregator beacon → AI classifier)</div>
+    <div id="tri" style="font-size:12px;color:var(--text-secondary)">no CSI node deployed yet…</div>
+    <div class="sect">Network events</div>
+    <ul class="log" id="netlog"></ul>
+  </div>
+</section>
+
+<script>
+'use strict';
+const CSSV = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL = {};
+['--writer','--executor','--scout','--relay','--critical','--warning','--good','--text-primary',
+ '--text-secondary','--text-muted','--line','--outside','--rock','--floor','--water','--fiber',
+ '--surface-1','--surface-3','--serious'].forEach(k => COL[k.slice(2)] = CSSV(k));
+const ROBOTS = ['writer_a', 'writer_b', 'executor', 'flix_a', 'flix_b'];
+const KIND = { writer_a: 'writer', writer_b: 'writer', executor: 'executor', flix_a: 'flix', flix_b: 'flix' };
+const RCOL = { writer_a: '--writer', writer_b: '--writer', executor: '--executor', flix_a: '--scout', flix_b: '--scout' };
+const RNAME = { writer_a: 'Writer A', writer_b: 'Writer B', executor: 'Executor', flix_a: 'Flix A', flix_b: 'Flix B' };
+const CSI = '#1fc8dc';
+const LOOP = ['Sense', 'Localize', 'Map', 'Identify frontiers', 'Evaluate', 'Select', 'Navigate'];
+const IDCOL = { writer_a: '#2f74f0', writer_b: '#f98c1a', flix_a: '#2f74f0', flix_b: '#f98c1a' };
+const JUNC = '#8c59f2';
+
+let CFG = null;
+const S = {
+  t: 0, scenario: '', beacons: [], cp: null, ona: {}, camera: { phase: 'intro', target: null },
+  pose: {}, disp: {}, csi: [], csiLinks: [], flixCsi: {}, beams: {},
+  anims: [], ripples: [], callouts: [], net: [], hover: null, viewMode: 'auto',
+};
+let EVN = {0:'PLACEMENT',1:'VICTIM',2:'HAZARD',3:'ENTRANCE',4:'PRESENCE',5:'EXPLORATION_COMPLETE',
+  6:'VICTIM_CONFIRMED',7:'FALSE_POSITIVE',8:'ROUTE_HEALED',9:'BEACON_LOST',10:'JUNCTION',11:'WRITER_EXIT',
+  12:'STATUS',13:'CSI_NODE'};
+let SRCN = {0: 'beacon network', 1: 'Writer A', 2: 'Writer B', 3: 'Flix A', 4: 'Flix B', 5: 'Executor', 6: 'ONA station'};
+const CAMN = {1: 'RGB-D camera', 2: 'thermal camera'};
+const pct = c => `${Math.round(100 * (c || 0))} %`;
+function confBar(c, col) {
+  return `<span class="bar"><i style="width:${Math.round(100 * (c || 0))}%;background:${col || COL.critical}"></i></span>`;
+}
+
+function pktColor(type, down) {
+  if (down) return COL.executor;
+  switch (type) {
+    case 1: case 6: return COL.critical;
+    case 4: case 13: return CSI;
+    case 2: case 7: return COL.warning;
+    case 5: case 11: case 12: return COL.writer;
+    case 8: case 9: return COL.good;
+    case 10: return JUNC;
+    default: return COL['text-primary'];
+  }
+}
+
+// ------------------------------------------------------------------ view (site / follow camera)
+const cv = document.getElementById('map');
+const ctx = cv.getContext('2d');
+{ const arc0 = ctx.arc.bind(ctx); ctx.arc = (x, y, r, a, b, c) => arc0(x, y, Math.max(0, r || 0), a, b, c); }
+let VIEW = { s: 4, ox: 0, oy: 0, W: 0, H: 0 };
+let SITE = { x0: -50, x1: 146, y0: -70, y1: 57 };
+let CUR = null;                          // current (animated) bounds
+const padT = 34, pad = 12, padB = 22;
+
+function targetBounds() {
+  const ph = S.camera.phase, tg = S.camera.target;
+  if (S.viewMode === 'site' || !tg || ph === 'intro' || ph === 'cutaway') return SITE;
+  const bm = /^beacon_(\d+)$/.exec(tg);                // rockfall cut: camera on a beacon
+  const p = bm ? beaconById(+bm[1]) : S.disp[tg];
+  if (!p) return SITE;
+  const r = cv.getBoundingClientRect();
+  const aspect = Math.max(0.4, (r.width - 2 * pad) / Math.max(1, r.height - padT - padB));
+  const span = /^flix/.test(tg) ? 60 : 46;            // metres across the shorter side
+  let w = span, h = span;
+  if (aspect > 1) w = span * aspect; else h = span / aspect;
+  return { x0: p.x - w / 2, x1: p.x + w / 2, y0: p.y - h / 2, y1: p.y + h / 2 };
+}
+function stepView(dt) {
+  const T = targetBounds();
+  if (!CUR) CUR = { ...T };
+  const a = Math.min(1, dt * 2.5);
+  for (const k of ['x0', 'x1', 'y0', 'y1']) CUR[k] += (T[k] - CUR[k]) * a;
+  const r = cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) {
+    cv.width = Math.max(1, Math.round(r.width * dpr)); cv.height = Math.max(1, Math.round(r.height * dpr));
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = r.width - 2 * pad, H = r.height - padT - padB;
+  const s = Math.max(0.05, Math.min(W / Math.max(1, CUR.x1 - CUR.x0), H / Math.max(1, CUR.y1 - CUR.y0)));
+  VIEW = { s, W: r.width, H: r.height,
+    ox: pad + (W - s * (CUR.x1 - CUR.x0)) / 2 - s * CUR.x0,
+    oy: padT + (H - s * (CUR.y1 - CUR.y0)) / 2 + s * CUR.y1 };
+}
+const X = x => VIEW.ox + x * VIEW.s;
+const Y = y => VIEW.oy - y * VIEW.s;
+const IX = px => (px - VIEW.ox) / VIEW.s;
+
+function beaconById(id) { return S.beacons.find(b => b.id === id); }
+function onaPos(l) { const o = CFG.onas[l || 'B']; return o ? o.pos : CFG.ona; }
+function nodePos(n) {
+  if (typeof n === 'string' && n.startsWith('ONA')) return onaPos(n.slice(4) || 'B');
+  if (ROBOTS.includes(n)) { const p = S.disp[n]; return p ? [p.x, p.y] : null; }
+  const b = beaconById(n); return b ? [b.x, b.y] : null;
+}
+
+// ------------------------------------------------------------------ drawing helpers
+function label(t, x, y, color, size = 11, align = 'left', bold = false) {
+  ctx.font = `${bold ? '600 ' : ''}${size}px system-ui`;
+  ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.fillText(t, X(x), Y(y)); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+function labelPx(t, px, py, color, size = 11, align = 'left', bold = false) {
+  ctx.font = `${bold ? '600 ' : ''}${size}px system-ui`;
+  ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.fillText(t, px, py); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  if (typeof PLACED !== 'undefined') {           // reserve the space: moving labels avoid it
+    const w = ctx.measureText(t).width;
+    PLACED.push([align === 'right' ? px - w : align === 'center' ? px - w / 2 : px, py - 7, w, 14]);
+  }
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function arrow(x1, y1, x2, y2, color, w = 1.5, dash = null, head = 7) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w;
+  if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath(); ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - head * Math.cos(a - 0.4), y2 - head * Math.sin(a - 0.4));
+  ctx.lineTo(x2 - head * Math.cos(a + 0.4), y2 - head * Math.sin(a + 0.4)); ctx.closePath(); ctx.fill();
+}
+const zoomed = () => VIEW.s > 9;
+let PLACED = [];
+/* draw a block of text lines near (px, py), nudged down until it overlaps no other block */
+function placeBlock(lines, px, py, align = 'left') {
+  ctx.font = '600 11px system-ui';
+  const w = Math.max(...lines.map(l => ctx.measureText(l[0]).width)) + 4, h = 13 * lines.length;
+  let x = align === 'right' ? px - w : align === 'center' ? px - w / 2 : px, y = py - 7;
+  for (let k = 0; k < 6; k++) {
+    const hit = PLACED.find(r => x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]);
+    if (!hit) break;
+    y = hit[1] + hit[3] + 1;
+  }
+  lines.forEach(([t, c, bold], i) => labelPx(t, x, y + 7 + 13 * i, c, bold ? 11 : 10, 'left', bold));
+}
+
+// ------------------------------------------------------------------ scene
+function drawScene() {
+  const { W, H } = VIEW;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = COL.rock; ctx.fillRect(Math.max(0, X(0)), 0, W, H);
+  ctx.fillStyle = COL.outside; ctx.fillRect(0, 0, Math.max(0, X(0)), H);
+  // grid (10 m, or 5 m when zoomed)
+  const g = zoomed() ? 5 : 10;
+  ctx.strokeStyle = '#ffffff0b'; ctx.lineWidth = 1;
+  const x0 = Math.floor(IX(0) / g) * g, x1 = IX(W);
+  for (let gx = x0; gx <= x1; gx += g) { ctx.beginPath(); ctx.moveTo(X(gx), 0); ctx.lineTo(X(gx), H); ctx.stroke(); }
+  const y1 = (VIEW.oy) / VIEW.s, y0 = (VIEW.oy - H) / VIEW.s;
+  for (let gy = Math.floor(y0 / g) * g; gy <= y1; gy += g) { ctx.beginPath(); ctx.moveTo(0, Y(gy)); ctx.lineTo(W, Y(gy)); ctx.stroke(); }
+  // galleries (SubT tile free space); line C: flooded between the ramps
+  for (const [a, b, c, d] of CFG.tunnels) {
+    ctx.fillStyle = COL.floor;
+    ctx.fillRect(X(a), Y(d), (b - a) * VIEW.s, (d - c) * VIEW.s);
+  }
+  ctx.fillStyle = COL.water;
+  const [wx0, wx1] = CFG.water_x;
+  ctx.fillRect(X(wx0), Y(-58), (wx1 - wx0) * VIEW.s, 4 * VIEW.s);
+  ctx.strokeStyle = '#4b8fb055'; ctx.lineWidth = 1;
+  for (let wx = wx0 + 2; wx < wx1; wx += 3) {
+    ctx.beginPath(); ctx.moveTo(X(wx), Y(-59.3)); ctx.quadraticCurveTo(X(wx + 0.75), Y(-58.9), X(wx + 1.5), Y(-59.3)); ctx.stroke();
+  }
+  labelPx('flooded sump (−5 m) · no ground robot · Flix flies over', X(30), Y(-62) + 9, '#7fb3cc', 10.5, 'center');
+  labelPx('air pocket', X(70), Y(-62) + 9, COL['text-muted'], 10.5, 'center');
+  // blockers (rock plugs at dead ends)
+  ctx.strokeStyle = '#6b6457'; ctx.lineWidth = 3;
+  for (const [bx, by] of CFG.blockers) {
+    const t = CFG.tiles.reduce((m, q) => Math.hypot(q[2] - bx, q[3] - by) < Math.hypot(m[2] - bx, m[3] - by) ? q : m);
+    const alongX = Math.abs(bx - t[2]) > Math.abs(by - t[3]);
+    const ex = alongX ? bx - Math.sign(bx - t[2]) * 1 : bx, ey = alongX ? by : by - Math.sign(by - t[3]) * 1;
+    ctx.beginPath();
+    if (alongX) { ctx.moveTo(X(ex), Y(ey - 2.4)); ctx.lineTo(X(ex), Y(ey + 2.4)); }
+    else { ctx.moveTo(X(ex - 2.4), Y(ey)); ctx.lineTo(X(ex + 2.4), Y(ey)); }
+    ctx.stroke();
+  }
+  // junction names
+  for (const t of CFG.tiles) if (t[1] === 'Tunnel Tile 1') label(t[0].toUpperCase(), t[2] + 2.6, t[3] + 2.8, COL['text-muted'], 10);
+  // cliff line + portals with the Flix survey result
+  ctx.strokeStyle = '#6b5a45'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke();
+  // openings: only those Flix has FOUND are drawn (no prior list); the sweep line shows coverage
+  const found = (S.cp && S.cp.entrances) || [];
+  const asg = (S.cp && S.cp.assign) || {};
+  for (const f of ['flix_a', 'flix_b']) {
+    const p = S.pose[f]; if (!p || p.sweep_y == null || !CFG.spawn) continue;
+    const y0 = f === 'flix_a' ? 4.5 : 2.5;
+    ctx.strokeStyle = 'rgba(25,158,112,0.45)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(X(-0.9), Y(y0)); ctx.lineTo(X(-0.9), Y(p.state === 'sweep' || p.state.startsWith('inspect') ? p.y : p.sweep_y)); ctx.stroke();
+  }
+  for (const e of found) {
+    const col = e.state === 'clear' ? COL.good : e.state === 'flooded' ? '#4b8fb0' : COL.critical;
+    ctx.strokeStyle = col; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(X(0), Y(e.y + 1.7)); ctx.lineTo(X(0), Y(e.y - 1.7)); ctx.stroke();
+    const who = Object.entries(asg).find(([w, pid]) => pid === e.id);
+    const txt = `${e.id} · ${e.state}${who ? ' → ' + RNAME[who[0]] : e.state === 'flooded' ? ' → ' + (RNAME[e.by] || 'Flix') + ' over the water' : e.state === 'collapsed' ? ' ✕' : ''}`;
+    labelPx(txt, X(0) - 6, Y(e.y + 1.7) - 9, COL['text-primary'], 11, 'right', true);
+  }
+  if (X(0) > 60 && X(0) < W - 60) {
+    labelPx('OUTSIDE · RTK-GPS', X(0) - 8, H - 32, COL['text-muted'], 10, 'right', true);
+    labelPx('INSIDE THE MINE · NO GPS', X(0) + 8, H - 32, COL['text-muted'], 10, 'left', true);
+  }
+  // miners' last known position (given to the Command Post)
+  const [lx, ly] = CFG.last_known;
+  ctx.strokeStyle = '#ffffff55'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(X(lx), Y(ly), 6 * VIEW.s, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  labelPx('last known position', X(lx) + 6 * VIEW.s + 4, Y(ly), COL['text-muted'], 10);
+  // lessons from the mission server: learned risk zones (all ONAs' past missions)
+  const sv = (S.cp && S.cp.server) || {};
+  for (const [list, col, txt] of [[sv.rockfall, '#e8a14f', 'learned: rockfall zone → denser beacons'],
+                                  [sv.collapse, '#d03b3b', 'learned: roof-collapse zone → beacon before it']]) {
+    for (const z of list || []) {
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.setLineDash([8, 5]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(X(z.x), Y(z.y), z.r * VIEW.s, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      labelPx(`${txt} (${z.rate}/mission)`, X(z.x), Y(z.y + z.r) - 8, col, 10, 'center');
+    }
+  }
+  // truth hazards (faint)
+  const gz = CFG.gas;
+  const rAlarm = gz.sigma * Math.sqrt(2 * Math.log(gz.peak / CFG.gas_alarm));
+  ctx.fillStyle = 'rgba(250,178,25,0.10)'; ctx.strokeStyle = 'rgba(250,178,25,0.45)'; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.arc(X(gz.x), Y(gz.y), rAlarm * VIEW.s, 0, 7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+  label('CH₄ leak (truth)', gz.x + rAlarm + 0.5, gz.y, COL['text-muted'], 10);
+  for (const v of CFG.victims) {
+    ctx.strokeStyle = COL['text-muted']; ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+    ctx.strokeRect(X(v.x - 0.5), Y(v.y + 0.5), Math.max(4, 1.0 * VIEW.s), Math.max(4, 1.0 * VIEW.s)); ctx.setLineDash([]);
+    labelPx(`miner (truth)`, X(v.x) - 8, Y(v.y) + 12, COL['text-muted'], 10, 'right');
+  }
+  // relay satellite (symbolic, high above) and its links to every ONA dish and to the CP
+  const sx = Math.max(SITE.x0 + 8, CFG.sat[0]), sy = Math.max(SITE.y0 + 6, CFG.sat[1]);   // drawn at the edge
+  const now = performance.now();
+  for (const [l, o] of Object.entries(CFG.onas).concat([['CP', { pos: CFG.cp }]])) {
+    const fl = S.beams[l] && now - S.beams[l] < 900;
+    ctx.strokeStyle = fl ? 'rgba(77,217,255,0.9)' : 'rgba(127,179,204,0.25)'; ctx.lineWidth = fl ? 2.5 : 1; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(X(o.pos[0]), Y(o.pos[1])); ctx.lineTo(X(sx), Y(sy)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.fillStyle = '#7fb3cc'; ctx.fillRect(X(sx) - 12, Y(sy) - 2, 24, 4); ctx.fillRect(X(sx) - 4, Y(sy) - 5, 8, 10);
+  labelPx('relay satellite (GEO, south)', X(sx), Y(sy) - 12, '#7fb3cc', 10, 'center', true);
+  // outside infrastructure: three ONAs (PC + dish), Command Post + mission server
+  for (const [l, o] of Object.entries(CFG.onas)) {
+    const [ox, oy] = o.pos;
+    ctx.fillStyle = COL['surface-3']; ctx.strokeStyle = COL['text-secondary']; ctx.lineWidth = 1.5;
+    roundRect(X(ox) - 22, Y(oy) - 11, 44, 22, 4); ctx.fill(); ctx.stroke();
+    labelPx(`ONA-${l}`, X(ox), Y(oy), COL['text-primary'], 10, 'center', true);
+    ctx.strokeStyle = '#7fb3cc'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(X(ox) - 30, Y(oy) - 8, 6, Math.PI * 0.75, Math.PI * 1.75); ctx.stroke();
+    // solar panels + battery state of the station
+    ctx.fillStyle = '#23345e'; ctx.fillRect(X(ox) - 34, Y(oy) + 4, 10, 7); ctx.fillRect(X(ox) - 23, Y(oy) + 13, 10, 7);
+    const en = (S.ona[l] || {}).energy;
+    if (en) labelPx(`☀ ${en.solar_w} W · 🔋${Math.round(100 * en.soc)}%${Object.keys(en.charging || {}).length ? ' · charging ' + Object.keys(en.charging).map(n => RNAME[n] || n).join(', ') : ''}`,
+      X(ox) - 38, Y(oy) + 20, COL['text-muted'], 9.5, 'right');
+  }
+  const [cx, cy] = CFG.cp;
+  ctx.fillStyle = COL['surface-3']; ctx.strokeStyle = COL['text-secondary']; roundRect(X(cx) - 14, Y(cy) - 9, 28, 18, 3); ctx.fill(); ctx.stroke();
+  labelPx('CP', X(cx), Y(cy), COL['text-primary'], 10, 'center', true);
+  const [svx, svy] = CFG.server;
+  ctx.fillStyle = '#1f2a22'; roundRect(X(svx) - 12, Y(svy) - 8, 24, 16, 3); ctx.fill(); ctx.stroke();
+  labelPx('SRV', X(svx), Y(svy), COL.good, 9, 'center', true);
+  label('Command Post + mission server', cx - 2, cy - 3.6, COL['text-muted'], 10, 'center');
+  for (const f of ['flix_a', 'flix_b']) {
+    const [fx, fy] = CFG.spawn[f];
+    ctx.strokeStyle = IDCOL[f]; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(X(fx), Y(fy), Math.max(4, 0.6 * VIEW.s), 0, 7); ctx.stroke();
+    label(`${RNAME[f]} pad`, fx, fy - 2.2, COL['text-muted'], 10, 'center');
+  }
+  label('staging', -15, -6.5, COL['text-muted'], 10, 'center');
+}
+
+function beaconColor(b) {
+  if (b.btype === 'victim') return COL.critical;
+  if (b.btype === 'junction') return JUNC;
+  if (b.btype === 'gas') {
+    const ev = S.cp && S.cp.events.find(e => e.beacon === b.id && e.type === 'HAZARD');
+    return ev && ev.status === 'FALSE POSITIVE' ? COL['text-muted'] : COL.warning;
+  }
+  return COL.relay;
+}
+
+function drawNetwork() {
+  const R = Math.max(4.5, Math.min(8, VIEW.s * 0.9));
+  for (const b of S.beacons) {
+    if (b.alive && (b.relocating || b.orphan || S.hover === b.id)) {
+      ctx.strokeStyle = b.relocating || b.orphan ? 'rgba(12,163,12,0.55)' : '#ffffff30';
+      ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), CFG.rf_range * VIEW.s, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  for (const b of S.beacons) {
+    if (!b.alive) continue;
+    const x1 = X(b.x), y1 = Y(b.y);
+    if (b.parent === 0) {                         // fiber tether to its own ONA
+      const [ox, oy] = onaPos(b.ona);
+      arrow(x1, y1, X(ox) + 22, Y(oy), COL.fiber, 2, [6, 4]);
+      continue;
+    }
+    const p = beaconById(b.parent);
+    if (!p) continue;
+    const dx = X(p.x) - x1, dy = Y(p.y) - y1, L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L;
+    const broken = !p.alive;
+    arrow(x1 + ux * R, y1 + uy * R, X(p.x) - ux * (R + 2), Y(p.y) - uy * (R + 2),
+      broken ? COL.critical : '#8d8c84', 1.5, broken ? [4, 4] : null, 6);
+  }
+  // "where to go": every beacon points to the next beacon toward the most urgent miner
+  for (const b of S.beacons) {
+    if (!b.alive || !b.next_in) continue;
+    const q = beaconById(b.next_in); if (!q || !q.alive) continue;
+    const dx = X(q.x) - X(b.x), dy = Y(q.y) - Y(b.y), L = Math.hypot(dx, dy) || 1;
+    if (L < 2 * R + 6) continue;
+    const ux = dx / L, uy = dy / L, ox = -uy * 4, oy = ux * 4;
+    arrow(X(b.x) + ux * R + ox, Y(b.y) + uy * R + oy, X(q.x) - ux * (R + 3) + ox, Y(q.y) - uy * (R + 3) + oy,
+      'rgba(224,90,90,0.75)', 1.2, [2, 3], 5);
+  }
+  // junction DFS tables: one spoke per exit (open / claimed by a Writer / explored / seen closed)
+  for (const b of S.beacons) {
+    if (!b.alive || !b.junction) continue;
+    for (const [k, e] of Object.entries(b.junction)) {
+      if (e.by === 'outside') continue;
+      const a = (+k) * Math.PI / 180, L = 5.5;
+      const col = e.st === 'claimed' ? (IDCOL[e.by] || COL.writer) : e.st === 'open' ? '#ffffffcc' : '#6b6457';
+      ctx.strokeStyle = col; ctx.lineWidth = e.st === 'claimed' ? 3 : 2;
+      ctx.setLineDash(e.st === 'open' ? [3, 3] : e.st === 'seen' ? [1, 3] : []);
+      ctx.beginPath(); ctx.moveTo(X(b.x), Y(b.y)); ctx.lineTo(X(b.x + L * Math.cos(a)), Y(b.y + L * Math.sin(a))); ctx.stroke();
+      ctx.setLineDash([]);
+      if (zoomed()) labelPx(e.st === 'claimed' ? `claimed ${RNAME[e.by] || ''}` : e.st, X(b.x + (L + 1.2) * Math.cos(a)),
+        Y(b.y + (L + 1.2) * Math.sin(a)), col, 9.5, 'center');
+    }
+  }
+  for (const b of S.beacons) if (b.relocating && b.target) {
+    arrow(X(b.x), Y(b.y), X(b.target[0]), Y(b.target[1]), COL.good, 1.5, [2, 3], 6);
+  }
+  for (const b of S.beacons) {
+    const x = X(b.x), y = Y(b.y), c = beaconColor(b);
+    ctx.fillStyle = COL['surface-1']; ctx.beginPath(); ctx.arc(x, y, R + 2, 0, 7); ctx.fill();
+    if (!b.alive) {
+      ctx.strokeStyle = COL.critical; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x - R, y - R); ctx.lineTo(x + R, y + R); ctx.moveTo(x + R, y - R); ctx.lineTo(x - R, y + R); ctx.stroke();
+      labelPx(`B${b.id} lost`, x, y - R - 8, COL.critical, 10, 'center', true);
+      continue;
+    }
+    ctx.fillStyle = c; ctx.globalAlpha = 0.25 + 0.75 * b.fresh;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    if ((b.csi_agg || []).length) {               // aggregator of a CSI cluster (AI classifier)
+      ctx.strokeStyle = CSI; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, R + 3.5, 0, 7); ctx.stroke();
+    }
+    const nev = (b.events || []).filter(e => e.kind !== 'not_found').length;
+    if (nev && (zoomed() || S.hover === b.id)) labelPx(`${nev} rec.`, x + R + 4, y + R + 6, COL['text-muted'], 9.5);
+    ctx.strokeStyle = c; ctx.lineWidth = 2; if (b.relocating) ctx.setLineDash([3, 2]);
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    if ((b.btype === 'victim' || b.btype === 'gas' || b.btype === 'junction') && R >= 6) {
+      ctx.fillStyle = '#111'; ctx.font = '700 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(b.btype === 'victim' ? '✚' : b.btype === 'gas' ? '!' : 'J', x, y + 0.5); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    }
+    if (zoomed() || b.parent === 0 || S.hover === b.id)
+      labelPx(b.parent === 0 ? `B${b.id} · E${b.owner === 'ONA-C crew' ? ' (ONA-C)' : ''}` : `B${b.id}`, x, y - R - 8, COL['text-primary'], 10.5, 'center', true);
+    if (b.held > 0) labelPx(`${b.held} held`, x, y + R + 9, COL.warning, 10, 'center', true);
+  }
+}
+
+function drawCSI() {
+  // Wi-Fi CSI links of the last window (brighter = channel more disturbed), nodes, presence regions
+  for (const [ax, ay, bx, by, sc] of S.csiLinks || []) {
+    ctx.strokeStyle = `rgba(31,200,220,${0.12 + 0.75 * Math.min(1, sc)})`; ctx.lineWidth = sc > 0.25 ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(X(ax), Y(ay)); ctx.lineTo(X(bx), Y(by)); ctx.stroke();
+  }
+  for (const n of S.csi || []) {
+    const x = X(n.x), y = Y(n.y);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = COL['surface-1']; ctx.fillRect(-6, -6, 12, 12);
+    ctx.fillStyle = CSI; ctx.fillRect(-4, -4, 8, 8); ctx.restore();
+    if (zoomed() || S.hover === 'n' + n.id) labelPx(`N${n.id}${n.agg ? ' → B' + n.agg : ''}`, x, y + 13, CSI, 9.5, 'center');
+  }
+  for (const b of S.beacons) {
+    for (const e of b.events || []) {
+      if (e.kind !== 'presence') continue;
+      ctx.strokeStyle = CSI; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(31,200,220,0.07)';
+      ctx.beginPath(); ctx.arc(X(e.x), Y(e.y), e.r * VIEW.s, 0, 7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+      placeBlock([[`CSI presence ${pct(e.conf)} (${SRCN[e.src] || ''})`, CSI, true]], X(e.x) + 6, Y(e.y + e.r) - 6);
+    }
+  }
+}
+
+function drawEvents() {
+  if (!S.cp) return;
+  for (const e of S.cp.events) {
+    const fp = e.status === 'FALSE POSITIVE' || e.status === 'NOT FOUND';
+    const st = e.status === 'CONFIRMED' ? '✓ confirmed' : e.status === 'NOT FOUND' ? '✕ not found' : fp ? '✕ false positive' : 'reported';
+    if (e.type === 'VICTIM') {
+      if (e.r > 0) {                               // CSI-only hypothesis: a region, not a point
+        ctx.strokeStyle = COL.critical; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(X(e.mx), Y(e.my), e.r * VIEW.s, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.fillStyle = COL.critical; ctx.font = '700 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✚', X(e.mx), Y(e.my)); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      const ev = `${e.cam ? 'cam ' + pct(e.cam) : ''}${e.cam && e.csi ? ' + ' : ''}${e.csi ? 'CSI ' + pct(e.csi) : ''}`;
+      placeBlock([[`${e.key} ${pct(e.conf)} · ${st}`, e.conf >= 0.9 ? COL.critical : COL['text-primary'], true],
+                  [e.no_ground ? 'not reachable by ground robots' : ev, COL['text-secondary'], false]], X(e.mx) - 10, Y(e.my) + 14, 'right');
+    } else {
+      const b = beaconById(e.beacon);
+      if (!b) continue;
+      placeBlock([[`gas · ${st}`, COL['text-primary'], true]], X(b.x) + 10, Y(b.y) + 12);
+    }
+  }
+}
+
+// ------------------------------------------------------------------ robots: truth vs estimate
+function track(pts, color, dash) {
+  if (!pts || pts.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash(dash || []);
+  ctx.beginPath(); ctx.moveTo(X(pts[0][0]), Y(pts[0][1]));
+  for (const [x, y] of pts.slice(1)) ctx.lineTo(X(x), Y(y));
+  ctx.stroke(); ctx.setLineDash([]);
+}
+function glyph(kind, x, y, yaw, color, r, hollow) {
+  kind = KIND[kind] || kind;
+  ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = 2;
+  const a = -yaw;
+  ctx.beginPath();
+  if (kind === 'writer' || kind === 'executor') {
+    ctx.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
+    ctx.lineTo(x + r * Math.cos(a + 2.5), y + r * Math.sin(a + 2.5));
+    ctx.lineTo(x + r * Math.cos(a - 2.5), y + r * Math.sin(a - 2.5));
+    ctx.closePath();
+  } else {                                      // flix: X frame + 4 rotors
+    const q = r * 0.75;
+    for (const s of [a + Math.PI / 4, a - Math.PI / 4]) {
+      ctx.moveTo(x - q * Math.cos(s), y - q * Math.sin(s)); ctx.lineTo(x + q * Math.cos(s), y + q * Math.sin(s));
+    }
+    ctx.stroke();
+    if (!hollow) for (let k = 0; k < 4; k++) {
+      const s = a + Math.PI / 4 + k * Math.PI / 2;
+      ctx.beginPath(); ctx.arc(x + q * Math.cos(s), y + q * Math.sin(s), 2.6, 0, 7); ctx.fill();
+    }
+    return;
+  }
+  if (hollow) ctx.stroke(); else ctx.fill();
+}
+function drawRobot(k) {
+  const p = S.pose[k], d = S.disp[k];
+  if (!p || !d) return;
+  const color = CSSV(RCOL[k]);
+  const lost = p.state === 'destroyed';
+  // tracks: true path (solid, faint) and the robot's own estimate (dashed)
+  ctx.globalAlpha = 0.45; track(p.track_true, color); ctx.globalAlpha = 0.8;
+  track(p.track_est, color, [4, 4]); ctx.globalAlpha = 1;
+  const ex = X(p.ex), ey = Y(p.ey), r = 9;
+  // uncertainty (1 sigma) around the estimate
+  if (p.sigma && p.sigma * VIEW.s > 3) {
+    ctx.fillStyle = color; ctx.globalAlpha = 0.10;
+    ctx.beginPath(); ctx.arc(ex, ey, p.sigma * VIEW.s, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  ctx.strokeStyle = '#ffffff66'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+  ctx.beginPath(); ctx.moveTo(X(d.x), Y(d.y)); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+  glyph(k, ex, ey, p.eyaw, color, r, true);
+  ctx.fillStyle = COL['surface-1']; ctx.beginPath(); ctx.arc(X(d.x), Y(d.y), r + 2, 0, 7); ctx.fill();
+  glyph(k, X(d.x), Y(d.y), d.yaw, lost ? COL['text-muted'] : color, r, false);
+  if (IDCOL[k]) { ctx.fillStyle = IDCOL[k]; ctx.beginPath(); ctx.arc(X(d.x), Y(d.y), 3, 0, 7); ctx.fill(); }
+  let tag = RNAME[k] + (lost ? ' LOST' : '');
+  if (KIND[k] === 'flix') tag += ` · ${(p.z || 0).toFixed(1)} m · 🔋${Math.round(100 * (p.battery || 0))}%`;
+  if (KIND[k] === 'writer' && p.stock != null) tag += ` · ${p.stock} beacons · ${p.csi_stock} CSI`;
+  if (KIND[k] !== 'flix' && p.battery != null) tag += ` · 🔋${Math.round(100 * p.battery)}%${p.charging ? ' ⚡' : ''}`;
+  placeBlock([[tag, lost ? COL.critical : COL['text-primary'], true],
+              [`err ${p.err.toFixed(2)} m`, COL['text-secondary'], false]], X(d.x) + 13, Y(d.y) - 12);
+  if (k === 'executor' && (p.state === 'en_route')) {
+    const tb = p.target != null ? beaconById(p.target) : null;
+    if (tb) {
+      ctx.strokeStyle = 'rgba(57,135,229,0.55)'; ctx.setLineDash([2, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X(d.x), Y(d.y)); ctx.lineTo(X(tb.x), Y(tb.y)); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (p.grad != null) {
+      const L = Math.max(2.6, 22 / VIEW.s);
+      arrow(X(d.x), Y(d.y), X(d.x + L * Math.cos(p.grad)), Y(d.y + L * Math.sin(p.grad)), COL.good, 2, null, 6);
+    }
+  }
+}
+function drawRobots() {
+  for (const k of ['flix_a', 'flix_b', 'writer_a', 'writer_b', 'executor']) drawRobot(k);
+}
+
+// ------------------------------------------------------------------ animations
+function addAnim(from, to, color, dur = 380, size = 5) {
+  if (!from || !to) return;
+  S.anims.push({ from, to, color, t0: performance.now(), dur, size });
+}
+const LIFE = 3500;
+function callout(text, x, y, color) {
+  S.callouts.push({ text, x, y, color: color || COL['text-primary'], t0: performance.now() });
+}
+function drawProfile() {
+  // line C side view while Flix B is over the flooded sump: floor, water, roof, Flix height
+  const pc = document.getElementById('profile');
+  const r = S.pose.flix_b;
+  const show = r && r.in_c;
+  pc.style.display = show ? 'block' : 'none';
+  if (!show) return;
+  const dpr = window.devicePixelRatio || 1, W = 280, H = 112;
+  if (pc.width !== W * dpr) { pc.width = W * dpr; pc.height = H * dpr; }
+  const g = pc.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const px = x => 10 + (x + 2) / 80 * (W - 20), pz = z => 18 + (5.2 - z) / 10.6 * (H - 30);
+  const rc = CFG.roof_clear || 4.85;
+  g.fillStyle = '#16384acc';
+  const [w0, w1] = CFG.water_x;
+  g.beginPath(); g.moveTo(px(w0), pz(CFG.water_z));
+  for (let x = w0; x <= w1; x += 1) g.lineTo(px(x), pz(cz(x)));
+  g.lineTo(px(w1), pz(CFG.water_z)); g.closePath(); g.fill();
+  g.strokeStyle = '#a07a4a'; g.lineWidth = 2; g.beginPath(); g.moveTo(px(-2), pz(0));
+  for (let x = -2; x <= 78; x += 1) g.lineTo(px(x), pz(cz(x))); g.stroke();
+  g.strokeStyle = '#6b6457'; g.beginPath(); g.moveTo(px(0), pz(rc));
+  for (let x = 0; x <= 78; x += 1) g.lineTo(px(x), pz(cz(x) + rc)); g.stroke();
+  g.strokeStyle = '#4b8fb0'; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(px(w0), pz(CFG.water_z)); g.lineTo(px(w1), pz(CFG.water_z)); g.stroke(); g.setLineDash([]);
+  const v = CFG.victims.find(q => q.y < -50); if (v) { g.fillStyle = COL.critical; g.font = '700 12px system-ui'; g.fillText('✚', px(v.x) - 4, pz(0) - 4); }
+  g.fillStyle = COL.fiber; g.beginPath(); g.arc(px(CFG.ona_c_beacon[0]), pz(0) - 2, 3.5, 0, 7); g.fill();
+  if (S.flixTrack.length > 1) { g.strokeStyle = COL.scout; g.lineWidth = 1.5; g.beginPath();
+    S.flixTrack.forEach(([x, z], i) => i ? g.lineTo(px(x), pz(z)) : g.moveTo(px(x), pz(z))); g.stroke(); }
+  g.fillStyle = COL.scout; g.beginPath(); g.arc(px(r.x), pz(r.z || 0), 4.5, 0, 7); g.fill();
+  const surf = Math.max(cz(r.x), r.x > 0 ? CFG.water_z : 0);
+  g.fillStyle = COL['text-secondary']; g.font = '600 10.5px system-ui';
+  g.fillText(`Line C side view · Flix B ${((r.z || 0) - surf).toFixed(1)} m above the ${r.x > w0 && r.x < w1 ? 'water' : 'floor'} · ${r.state}`, 8, 12);
+  g.fillStyle = COL['text-muted']; g.font = '10px system-ui';
+  g.fillText('ONA-C beacon', px(0) - 4, pz(0) + 14); g.fillText('air pocket', px(62), pz(0) + 14);
+}
+function cz(x) { return x <= 0 ? 0 : x <= 20 ? -x / 4 : x <= 40 ? -5 : x <= 60 ? -5 + (x - 40) / 4 : 0; }
+function drawAnims(now) {
+  S.ripples = S.ripples.filter(a => now - a.t0 < a.dur);
+  for (const a of S.ripples) {                   // Wi-Fi CSI presence pulses
+    const k = (now - a.t0) / a.dur;
+    for (let i = 0; i < 3; i++) {
+      const kk = (k + i / 3) % 1;
+      ctx.strokeStyle = `rgba(31,200,220,${0.7 * (1 - kk)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(X(a.at[0]), Y(a.at[1]), kk * a.r * VIEW.s, 0, 7); ctx.stroke();
+    }
+  }
+  S.anims = S.anims.filter(a => now - a.t0 < a.dur + 120);
+  for (const a of S.anims) {
+    const k = Math.min(1, (now - a.t0) / a.dur);
+    const x = a.from[0] + (a.to[0] - a.from[0]) * k, y = a.from[1] + (a.to[1] - a.from[1]) * k;
+    ctx.fillStyle = COL['surface-1']; ctx.beginPath(); ctx.arc(X(x), Y(y), a.size + 2, 0, 7); ctx.fill();
+    ctx.fillStyle = a.color; ctx.beginPath(); ctx.arc(X(x), Y(y), a.size, 0, 7); ctx.fill();
+  }
+  S.callouts = S.callouts.filter(c => now - c.t0 < LIFE);
+  const placed = [];
+  for (const c of S.callouts) {
+    const age = (now - c.t0) / LIFE;
+    ctx.globalAlpha = age < 0.8 ? 1 : (1 - age) * 5;
+    ctx.font = '600 12px system-ui';
+    const w = ctx.measureText(c.text).width + 12;
+    let px = Math.min(Math.max(X(c.x) - w / 2, 4), VIEW.W - w - 4), py = Math.min(Math.max(Y(c.y) - 34, 26), VIEW.H - 30);
+    for (let guard = 0; guard < 8; guard++) {
+      const hit = placed.find(r => px < r[0] + r[2] && px + w > r[0] && py < r[1] + 22 && py + 22 > r[1]);
+      if (!hit) break;
+      py = hit[1] - 24;
+    }
+    if (py < 26) py = 26;
+    placed.push([px, py, w]);
+    ctx.fillStyle = COL['surface-3']; ctx.strokeStyle = c.color; ctx.lineWidth = 1.5;
+    roundRect(px, py, w, 20, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = COL['text-primary']; ctx.fillText(c.text, px + 6, py + 14);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function lerpPoses(dt) {
+  for (const k of ROBOTS) {
+    const p = S.pose[k]; if (!p) continue;
+    const d = S.disp[k];
+    if (!d || Math.hypot(p.x - d.x, p.y - d.y) > 5) { S.disp[k] = { ...p }; continue; }
+    const a = Math.min(1, dt * 8);
+    d.x += (p.x - d.x) * a; d.y += (p.y - d.y) * a; d.z = p.z;
+    let dy = p.yaw - d.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+    d.yaw += dy * a;
+  }
+}
+
+function drawScale() {
+  const m = [1, 2, 5, 10, 20, 50].find(v => v * VIEW.s > 60) || 50;
+  document.getElementById('scale').textContent = `▔▔▔ ${m} m`;
+  document.getElementById('scale').style.letterSpacing = '0';
+}
+
+let lastFrame = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+  if (CFG) {
+    try {
+      lerpPoses(dt); stepView(dt);
+      PLACED = [];
+      drawScene(); drawCSI(); drawNetwork(); drawRobots(); drawEvents(); drawAnims(now); drawScale(); drawProfile();
+    } catch (e) { console.error(e); }       // never stop the animation loop
+  }
+  requestAnimationFrame(frame);
+}
+
+// ------------------------------------------------------------------ pipeline dots
+function cardCenter(id) {
+  const lane = document.getElementById('pipe').getBoundingClientRect();
+  const r = document.getElementById(id).getBoundingClientRect();
+  return [r.left - lane.left + r.width / 2, r.top - lane.top + r.height / 2];
+}
+function pipeDot(fromId, toId, color, down) {
+  const pipe = document.getElementById('pipe');
+  const [x1, y1] = cardCenter(fromId), [x2] = cardCenter(toId);
+  const el = document.createElement('div');
+  el.className = 'pdot'; el.style.background = color;
+  el.style.left = x1 + 'px'; el.style.top = (y1 + (down ? 12 : -12)) + 'px';
+  pipe.appendChild(el);
+  const dur = fromId === 'cSAT' || toId === 'cSAT' ? 520 : 360;
+  el.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${x2 - x1}px, 0)` }],
+    { duration: dur, easing: 'ease-in-out' }).onfinish = () => el.remove();
+  flash(toId);
+}
+function flash(id) {
+  const c = document.getElementById(id); if (!c) return; c.classList.add('flash');
+  clearTimeout(c._t); c._t = setTimeout(() => c.classList.remove('flash'), 450);
+}
+function onaFlash(l) { if (l) { flash('ona' + l); S.beams[l] = performance.now(); } }
+
+// ------------------------------------------------------------------ flows
+function netlog(text, cls) {
+  S.net.unshift({ t: S.t, text, cls });
+  S.net = S.net.slice(0, 40);
+  document.getElementById('netlog').innerHTML =
+    S.net.map(n => `<li class="${n.cls || ''}"><span class="t">${n.t.toFixed(1)}s</span>${esc(n.text)}</li>`).join('');
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+const WIRELESS = { go: 'GO → Writer (portal + last known position)', flix_task: 'Task → Flix: fast writer',
+  lessons: 'Lessons from the mission server → Writers', briefing: 'Briefing → Executor (outside radio)',
+  briefing_update: 'Briefing update → Executor' };
+
+function onFlow(f, replay) {
+  if (f.t) S.t = Math.max(S.t, f.t);
+  if (f.pkt && f.hex && !f.refresh && ['tx', 'rf_up'].includes(f.kind) && f.pkt.type !== 12) showPacket(f);
+  if (replay) return;
+  const k = f.kind;
+  const pc = f.pkt ? pktColor(f.pkt.type, false) : COL['text-primary'];
+  switch (k) {
+    case 'drop': {
+      const p = [f.x, f.y];
+      const who = RNAME[f.by] || f.by;
+      addAnim(p, p, COL.writer, 500, 9);
+      callout(`B${f.id} ${f.btype} (${who}${f.stock != null ? ', ' + f.stock + ' left' : ''})`, f.x, f.y, COL.writer);
+      netlog(`${who} dropped B${f.id} (${f.btype}${f.btype === 'junction' ? ' = mapping event' : ''}), radio parent ${f.parent === 0 ? 'fibre/ONA' : 'B' + f.parent}, toward exit B${f.next_out || 0}`);
+      break;
+    }
+    case 'csi_drop': {
+      addAnim([f.x, f.y], [f.x, f.y], CSI, 500, 8);
+      callout(`CSI node N${f.id} (${RNAME[f.by] || f.by}, ${f.stock} left)`, f.x, f.y, CSI);
+      netlog(`${RNAME[f.by] || f.by} dropped ESP32-S3 CSI node N${f.id} (${f.why}) → streams to ${f.agg ? 'B' + f.agg : 'no beacon yet'}`);
+      break;
+    }
+    case 'presence': {
+      S.ripples.push({ at: [f.x, f.y], r: Math.max(6, f.r), t0: performance.now(), dur: 2400 });
+      callout(`B${f.at} AI classifier: presence ${pct(f.conf)}`, f.x, f.y, CSI);
+      netlog(`Wi-Fi CSI: B${f.at} classifier → human presence ${pct(f.conf)} in a ${f.r} m region (${f.links} disturbed links)`, 'alert');
+      break;
+    }
+    case 'fusion':
+      if (f.new) netlog(`Command Post: new victim hypothesis ${f.key} (${f.by}, ${pct(f.conf)})${f.no_ground ? ' - not reachable by ground robots' : ''}`, 'alert');
+      else netlog(`Command Post fusion: ${f.key} + ${f.by} → ${pct(f.old)} → ${pct(f.conf)} (camera ${pct(f.cam)}, CSI ${pct(f.csi)})`, 'ok');
+      break;
+    case 'writer_lost': netlog(`Server: ${RNAME[f.robot]} missed 3 heartbeats - presumed lost`, 'alert'); break;
+    case 'ona_beacon': netlog(`ONA-${f.ona} crew places the station's fibered first beacon at the flooded portal`, 'ok'); break;
+    case 'hop': addAnim(nodePos(f.frm), nodePos(f.to), pc); break;
+    case 'rf_up': addAnim(nodePos(f.frm), nodePos(f.to), pc);
+      if (/^flix/.test(f.frm)) netlog(`${RNAME[f.frm]} radio → B${f.to}: ${f.pkt ? EVN[f.pkt.type] : 'report'} ${f.txt || ''}`);
+      break;
+    case 'fiber_up': addAnim(nodePos(f.frm), onaPos(f.ona), pc, 420); pipeDot('cE', 'cONA', pc, false); onaFlash(f.ona);
+      document.getElementById('vE').textContent =
+        `B${f.frm} → fibre → ONA-${f.ona}: ${EVN[f.pkt.type]} (${f.hops} hops)`; break;
+    case 'sat_up': pipeDot('cONA', 'cSAT', f.pkt ? pc : COL.scout, false); onaFlash(f.ona); S.beams.CP = performance.now();
+      setTimeout(() => pipeDot('cSAT', 'cCP', f.pkt ? pc : COL.scout, false), 300);
+      document.getElementById('vSAT').textContent = `↑ ${f.pkt ? EVN[f.pkt.type] : f.msg}`; break;
+    case 'translate':
+      document.getElementById('vONA2').textContent =
+        `ONA-${f.ona}: ${f.pkt.id >= 200 ? 'robot' : 'B' + f.pkt.id} (${f.pkt.x.toFixed(2)}, ${f.pkt.y.toFixed(2)}, ${(f.pkt.z || 0).toFixed(2)}) m → ${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}, ${(f.alt || 0).toFixed(1)} m`;
+      break;
+    case 'junction': if (f.claim != null) {
+        callout(`${RNAME[f.by]} claims exit ${f.claim}° at B${f.id}`, f.x, f.y, IDCOL[f.by] || JUNC);
+        netlog(`${RNAME[f.by]}: junction B${f.id}, claims exit ${f.claim}° (best utility)`); }
+      break;
+    case 'release': netlog(`Server released ${f.n} exit(s) claimed by ${RNAME[f.robot]} - open for the other Writer`, 'alert'); break;
+    case 'sat_down': pipeDot('cCP', 'cSAT', COL.executor, true); S.beams.CP = performance.now(); onaFlash(f.ona);
+      setTimeout(() => pipeDot('cSAT', 'cONA', COL.executor, true), 300);
+      document.getElementById('vSAT').textContent = `↓ ${f.msg}`; break;
+    case 'translate_down':
+      document.getElementById('vONA2').textContent = `ONA-${f.ona} ${f.msg}: GPS → site frame, ${f.size} B binary`;
+      netlog(`ONA-${f.ona} encoded ${f.msg} (${f.size} bytes) for route ${f.path.map(i => 'B' + i).join('›')}`); break;
+    case 'fiber_down': pipeDot('cONA', 'cE', COL.executor, true); onaFlash(f.ona); break;
+    case 'fiber_down_in': addAnim(onaPos(f.ona), nodePos(f.to), COL.executor, 420); break;
+    case 'hop_down': addAnim(nodePos(f.frm), nodePos(f.to), COL.executor); break;
+    case 'rf_down': addAnim(nodePos(f.frm), nodePos('executor'), COL.executor, 420, 6);
+      callout(`${f.msg === 'briefing' ? 'Briefing' : 'Briefing update'} → Executor`, S.disp.executor ? S.disp.executor.x : 0,
+        S.disp.executor ? S.disp.executor.y : 0, COL.executor); break;
+    case 'wireless_in': {
+      const o = onaPos(f.ona), src = nodePos(f.frm) || o;
+      addAnim(src, o, COL.scout, 420); onaFlash(f.ona);
+      if (f.msg === 'drone_report') callout(`${RNAME[f.frm] || 'Flix'}: hillside survey sent`, o[0], o[1], COL.scout);
+      if (f.msg === 'portal_found') callout(`${RNAME[f.frm] || 'Flix'}: opening found`, o[0], o[1], COL.scout);
+      break;
+    }
+    case 'wireless_out': {
+      const o = onaPos(f.ona);
+      const tos = f.to === 'all' ? ['writer_a', 'writer_b'] : [f.to];
+      for (const t of tos) addAnim(o, nodePos(t), COL.good, 420, 6);
+      callout(WIRELESS[f.msg] || f.msg, o[0], o[1], COL.good);
+      netlog(`ONA-${f.ona} wireless: ${WIRELESS[f.msg] || f.msg}${f.to && f.to !== 'all' ? ' (' + (RNAME[f.to] || f.to) + ')' : ''}`, 'ok'); break;
+    }
+    case 'hold': netlog(`B${f.at} holding message (store & forward, ${f.n} queued)`, 'alert'); break;
+    case 'ack_fail': netlog(`ACK failed B${f.frm}→B${f.to}: message kept at B${f.frm}`, 'alert'); break;
+    case 'flush': netlog(`B${f.at} forwarding held message`, 'ok'); break;
+    case 'beacon_dead': callout(`B${f.id} destroyed`, f.x, f.y, COL.critical);
+      netlog(`B${f.id} destroyed by rockfall`, 'alert'); break;
+    case 'rockfall': callout('ROCKFALL', f.x, f.y, COL.critical); break;
+    case 'collapse': callout(`ROOF COLLAPSE on ${RNAME[f.robot] || 'Writer'}`, f.x, f.y, COL.critical);
+      netlog(`Roof collapse on ${RNAME[f.robot] || 'the Writer'}`, 'alert'); break;
+    case 'glitch': callout(`CH₄ sensor glitch ${f.value}%`, f.x, f.y, COL.warning);
+      netlog(`${RNAME[f.robot] || 'Writer'} gas sensor glitch (${f.value}% spike)`, 'alert'); break;
+    case 'heartbeat_lost': netlog(`B${f.at}: parent B${f.parent} silent (heartbeat lost)`, 'alert'); break;
+    case 'heal_plan': {
+      const b = beaconById(f.at);
+      if (b) callout(f.move > 0 ? `B${f.at} relocating ${f.move} m` : `B${f.at} re-linking`, b.x, b.y, COL.good);
+      netlog(f.move > 0 ? `Self-heal: B${f.at} drives ${f.move} m to re-link with B${f.new_parent}`
+        : `Self-heal: B${f.at} re-links to B${f.new_parent}`, 'ok'); break;
+    }
+    case 'relinked': callout(`B${f.at} → B${f.parent} link restored`, f.x, f.y, COL.good);
+      netlog(`B${f.at} re-linked to B${f.parent}: chain restored`, 'ok'); break;
+    case 'heal_failed': netlog(`B${f.at}: no relocation can restore the chain`, 'alert'); break;
+    case 'rf_fail': netlog(`${f.frm}: no beacon in radio range, retrying`, 'alert'); break;
+  }
+}
+
+const IDN = { 254: '0xFE Writer A', 249: '0xF9 Writer B', 253: '0xFD Executor', 252: '0xFC Flix A',
+  248: '0xF8 Flix B', 100: 'B100 (ONA-C first beacon)' };
+const FIELDS = [['beaconID', 0, 1, 0], ['eventType', 1, 2, 0], ['parentID', 2, 3, 0], ['flags', 3, 4, 0],
+  ['localX', 4, 8, 1], ['localY', 8, 12, 1], ['localZ', 12, 14, 1], ['heading', 14, 16, 1],
+  ['valueA', 16, 17, 2], ['valueB', 17, 18, 2], ['conf', 18, 19, 2],
+  ['nextIn', 19, 20, 3], ['bearingIn', 20, 22, 3], ['distIn', 22, 24, 3], ['nextOut', 24, 25, 3],
+  ['utc', 25, 29, 4], ['utcMs', 29, 31, 4], ['eventID', 31, 32, 4]];
+const GROUPS = ['who / what (+ source)', 'where it is', 'what was found (+ detection confidence)', 'where to go', 'when (+ event identifier)'];
+function showPacket(f) {
+  const p = f.pkt, hex = f.hex;
+  const src = typeof f.at === 'number' ? `beacon B${f.at}` : (f.frm ? `${RNAME[f.frm] || f.frm} (radio → B${f.to})` : '');
+  const utc = new Date((p.utc + (p.utc_ms || 0) / 1000) * 1000).toISOString().replace('T', ' ').replace('Z', ' UTC');
+  document.getElementById('pktHead').innerHTML =
+    `<b style="color:var(--text-primary)">${EVN[p.type] || p.type}</b> · from ${esc(src)} · ${utc} · ${hex.length / 2} bytes`
+    + (f.txt ? `<br><span style="color:var(--text-primary)">${esc(f.txt)}</span>` : '');
+  const bytes = hex.match(/../g) || [];
+  const F = FIELDS;
+  document.getElementById('hex').innerHTML = F.map(([n, a, z, g]) =>
+    `<span class="g${g}" title="${GROUPS[g]}: ${n}">${bytes.slice(a, z).join(' ')}</span>`).join('');
+  const fl = p.flags, fls = [];
+  if (fl & 1) fls.push('stored-fwd'); if (fl & 2) fls.push('relocated'); if (fl & 4) fls.push('not reachable by ground');
+  if (fl & 8) fls.push('fused');
+  const t = p.type;
+  const vA = t === 2 ? `CH₄ ${(p.a / 10).toFixed(1)} %` : [1, 6].includes(t) ? `range ${(p.a / 10).toFixed(1)} m`
+    : t === 4 ? `region radius ${p.a} m` : [5, 11, 12].includes(t) ? `${p.a} beacons left` : t === 10 ? 'exits E,N,W,S (2 bits each)'
+    : t === 13 ? `node N${p.a}` : String(p.a);
+  const vB = t === 2 ? `O₂ ${((p.b + 150) / 10).toFixed(1)} %` : [1, 6].includes(t) ? (CAMN[p.b] || 'camera')
+    : t === 4 ? `${p.b} disturbed CSI links` : [5, 11, 12].includes(t) ? `~${2 * p.b} m explored` : t === 13 ? `${p.b} node(s) in the cluster`
+    : t === 7 ? `about a ${EVN[p.b] || p.b} record` : String(p.b);
+  const val = {
+    beaconID: IDN[p.id] || 'B' + p.id,
+    eventType: `${p.type} ${EVN[p.type] || ''}`, parentID: p.parent === 0 ? '0 (fibre/ONA)' : (IDN[p.parent] || 'B' + p.parent),
+    flags: `0x${(fl | (p.src << 4)).toString(16).padStart(2, '0')} source ${p.src} = ${SRCN[p.src] || '?'}${fls.length ? ' · ' + fls.join(', ') : ''}`,
+    localX: p.x.toFixed(3) + ' m',
+    localY: p.y.toFixed(3) + ' m', localZ: (p.z || 0).toFixed(2) + ' m', heading: p.heading.toFixed(1) + '°',
+    valueA: vA, valueB: vB, conf: t === 12 ? `battery ${pct(p.conf)}` : `detection confidence ${pct(p.conf)}`,
+    nextIn: p.next_in ? 'B' + p.next_in : '0 (the event is here)', bearingIn: p.bearing_in.toFixed(1) + '°',
+    distIn: p.dist_in.toFixed(1) + ' m', nextOut: p.next_out ? 'B' + p.next_out : '0 (portal)',
+    utc: `${p.utc} s`, utcMs: `${p.utc_ms} ms`, eventID: `${p.eid} (${SRCN[p.src] || '?'}${p.eid >= 128 ? ' CSI network' : ''})`,
+  };
+  let lastG = -1;
+  document.getElementById('fields').innerHTML = F.map(([n, a, z, g]) => {
+    const head = g !== lastG ? `<tr><td colspan="4" class="grp">${GROUPS[g]}</td></tr>` : ''; lastG = g;
+    return head + `<tr><td>${n}</td><td class="mono">${a}${z - a > 1 ? '–' + (z - 1) : ''}</td><td class="mono">${bytes.slice(a, z).join('')}</td><td>${esc(val[n] || '')}</td></tr>`;
+  }).join('');
+}
+
+// ------------------------------------------------------------------ panels
+const STEPS = ['Flix find the openings', 'Writers explore (frontiers + DFS)', 'Victim on the map', 'Executor briefed',
+  'Executor en route', 'Victims confirmed + first aid', 'Mission stored'];
+function stepIndex() {
+  const ph = S.cp ? S.cp.phase : 'standby';
+  const ex = S.pose.executor ? S.pose.executor.state : '';
+  const victim = S.cp && S.cp.events.some(e => e.type === 'VICTIM');
+  if (ph === 'mission_complete') return 7;
+  if (S.cp && S.cp.visited && S.cp.visited.length) return 5;
+  if (['en_route', 'waiting_chain', 'final_approach'].includes(ex)) return 4;
+  if (ph === 'executor_briefed') return 3;
+  if (victim) return 2;
+  if (ph === 'writers_exploring') return 1;
+  if (ph === 'discovery') return 0;
+  return -1;
+}
+function renderSteps() {
+  const i = stepIndex();
+  document.getElementById('steps').innerHTML = STEPS.map((s, k) =>
+    `<span class="step ${k < i ? 'done' : k === i ? 'now' : ''}">${k + 1} ${s}</span>`).join('');
+}
+function statusChip(e) {
+  if (e.status === 'CONFIRMED') return '<span class="st ok"><span class="ic">✓</span>CONFIRMED</span>';
+  if (e.status === 'FALSE POSITIVE') return '<span class="st fp"><span class="ic">✕</span>FALSE POSITIVE</span>';
+  if (e.status === 'NOT FOUND') return '<span class="st fp"><span class="ic">✕</span>NOT FOUND</span>';
+  if (e.no_ground) return '<span class="st bad"><span class="ic">≈</span>NO GROUND ACCESS</span>';
+  return '<span class="st rep"><span class="ic">●</span>REPORTED</span>';
+}
+function prChip(e) {
+  if (e.type !== 'VICTIM') return '';
+  const c = e.conf >= 0.9 ? 'p1' : e.conf >= 0.6 ? 'p2' : 'p3';
+  return `<span class="pr ${c}">${pct(e.conf)}</span>`;
+}
+function renderCP() {
+  const cp = S.cp; if (!cp) return;
+  const tb = document.getElementById('events');
+  const evs = cp.events.slice().sort((a, b) => (a.type === 'VICTIM' ? 0 : 1) - (b.type === 'VICTIM' ? 0 : 1)
+    || (a.no_ground ? 1 : 0) - (b.no_ground ? 1 : 0) || (b.conf || 0) - (a.conf || 0));
+  tb.innerHTML = evs.length ? evs.map(e => {
+    const ev = e.type === 'VICTIM' ? (e.obs || []).map(o =>
+      `${confBar(o.conf, o.kind === 'csi' ? CSI : COL.critical)}${esc(o.name)} ${pct(o.conf)}${o.kind === 'csi' ? ` <small style="color:var(--text-muted)">(${o.region} m region, ${o.links} links)</small>` : ''}`).join('<br>')
+      : `${esc((e.sources || []).join(' → '))} · ${esc(e.value || 'CH₄')}`;
+    const fused = e.type === 'VICTIM' ? `${prChip(e)}<br><small style="color:var(--text-muted)">cam ${pct(e.cam)} ⊕ CSI ${pct(e.csi)}</small>` : '';
+    return `<tr><td>${e.type === 'VICTIM' ? '<span style="color:var(--critical)">✚</span> ' + e.key + (e.r > 0 ? ' <small>(region ' + e.r.toFixed(0) + ' m)</small>' : '') : '<span style="color:var(--warning)">⚠</span> Hazard'}
+       ${e.beacon != null ? `<span class="mono" style="color:var(--text-muted)">B${e.beacon}</span>` : ''}${e.note ? `<br><small style="color:var(--text-muted)">${esc(e.note)}</small>` : ''}</td>
+     <td>${ev}</td><td>${fused}</td>
+     <td class="mono">${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}${e.alt != null ? ', ' + e.alt.toFixed(1) + ' m' : ''}</td>
+     <td class="mono">${e.age.toFixed(0)} s · ${(e.fresh * 100).toFixed(0)}%</td><td>${statusChip(e)}</td></tr>`; }).join('')
+    : '<tr><td colspan="6">no events yet</td></tr>';
+  const b = cp.briefing;
+  const cl = (cp.cand_log || []).slice(-1)[0];
+  document.getElementById('briefing').innerHTML = b ?
+    `<div class="brief"><b>Executor → ${b.victim}</b> (${esc(b.why || '')}) at t=${b.t}s${b.update ? ' · <b>route updated</b>' : ''}<br>
+     route <span class="mono">${b.path.map(i => 'B' + i).join(' › ')}</span> · ${b.dist} m · ETA ~${b.eta} s
+     ${b.verify.length ? ' · re-measure gas at ' + b.verify.map(i => 'B' + i).join(', ') : ''}
+     ${cl ? `<br><small>order (confidence, then distance): ${cl.cands.map(([k, c, d]) => `${k} ${pct(c)} / ${d.toFixed(0)} m`).join(' › ')}</small>` : ''}
+     ${cp.first_briefing ? `<br><small>first briefing at t=${cp.first_briefing.t}s, while the Writers were still exploring</small>` : ''}</div>` : '';
+  const en = document.getElementById('entr');
+  en.innerHTML = (cp.entrances && cp.entrances.length) ? cp.entrances.map(e => {
+    const w = Object.entries(cp.assign || {}).find(([k, v]) => v === e.id);
+    const dec = e.state === 'clear' ? (w ? `→ ${RNAME[w[0]]} + ${RNAME[w[0].replace('writer', 'flix')]}` : 'clear')
+      : e.state === 'flooded' ? `→ ${RNAME[e.by] || 'Flix'} inspects over the water · ONA-${e.id} first beacon` : 'rejected';
+    return `<tr><td><b>${e.id}</b> <span class="mono" style="color:var(--text-muted)">y=${e.y.toFixed(1)} · ${(e.width || 0).toFixed(1)} m wide</span></td>
+     <td>${RNAME[e.by] || ''}</td><td>${e.state === 'clear' ? '<span class="st ok"><span class="ic">✓</span>clear</span>'
+      : `<span class="st bad"><span class="ic">✕</span>${esc(e.state)}</span>`}<br><small style="color:var(--text-muted)">${esc(e.detail || '')}</small></td><td>${dec}</td></tr>`; }).join('')
+    : '<tr><td colspan="4">sweep in progress</td></tr>';
+  const sv = cp.server || {};
+  document.getElementById('lessons').innerHTML =
+    `<div style="font-size:12px;color:var(--text-muted)">${sv.missions || 0} past missions stored · from ${(sv.onas || []).map(o => 'ONA-' + o).join(', ') || '—'}${sv.saved ? ' · <b style="color:var(--good)">this mission stored</b>' : ''}</div>`
+    + (sv.lessons || []).map(t => `<div class="lesson">${esc(t)}</div>`).join('');
+  document.getElementById('log').innerHTML = cp.log.slice().reverse().map(l =>
+    `<li class="${l.level === 'alert' ? 'alert' : l.level === 'ok' ? 'ok' : ''}"><span class="t">${l.t.toFixed(1)}s</span>${esc(l.text)}</li>`).join('');
+  document.getElementById('vCP').textContent =
+    `${cp.phase.replace(/_/g, ' ')} · ${cp.events.filter(e => e.type === 'VICTIM').length} victim hypotheses · ${cp.rx} msgs`;
+  renderDone(cp);
+  renderSteps(); renderRobots(); renderDFS(); renderCSI();
+}
+function renderDone(cp) {
+  const el = document.getElementById('done'), s = cp.summary;
+  el.classList.toggle('on', cp.phase === 'mission_complete' && !!s);
+  if (!s || el.dataset.t === String(s.t)) return;
+  el.dataset.t = String(s.t);
+  const m = Math.floor(s.mission_s / 60), sec = Math.floor(s.mission_s % 60);
+  const list = a => a.length ? ` (${a.join(', ')})` : '';
+  el.innerHTML = `<b class="big">✓ MISSION COMPLETE</b>
+    <span>mission time <b>${m} min ${String(sec).padStart(2, '0')} s</b></span>
+    <span>victims confirmed <b>${s.confirmed.length}</b>${esc(list(s.confirmed))}</span>
+    <span>to the rescue team <b>${s.rescue_team.length}</b>${esc(list(s.rescue_team))}</span>
+    ${s.not_found.length ? `<span>not found <b>${s.not_found.length}</b></span>` : ''}
+    ${s.next_mission.length ? `<span>next mission <b>${s.next_mission.length}</b>${esc(list(s.next_mission))}</span>` : ''}
+    <span>gas <b>${s.gas_real}</b> real · <b>${s.gas_fp}</b> false</span>
+    <span>beacons <b>${s.beacons}</b> (${s.beacons_lost} lost)</span>
+    <span>${s.stored ? 'stored in the mission server memory' : 'mission memory read-only: not stored'}</span>
+    <span class="end">The simulation is over: nothing else will happen. Press <b>Ctrl+C</b> in the terminal to stop it.</span>`;
+}
+function renderDFS() {
+  const cp = S.cp || {};
+  document.getElementById('dfs').innerHTML = ['writer_a', 'writer_b'].map(w => {
+    const p = S.pose[w] || {}, s = (cp.writers || {})[w] || {};
+    const last = (p.dfs_log || []).slice(-1)[0] || '';
+    const loop = `<div class="loop">${LOOP.map(l => `<span class="${l === p.loop ? 'on' : ''}">${l}</span>`).join('')}</div>`;
+    const ut = (p.utility || []).slice(0, 4).map(u => `<div class="mono" style="font-size:11px;${u.chosen ? 'color:var(--text-primary)' : ''}">${u.chosen ? '▶' : '·'} B${u.node} ${u.exit}° U ${u.U.toFixed(2)}
+      <span style="color:var(--text-muted)">= gain ${u.gain.toFixed(2)} + rel ${u.rel.toFixed(2)} − dist ${u.dist.toFixed(0)} m − energy ${u.energy.toFixed(2)} + acc ${u.acc.toFixed(1)}</span></div>`).join('');
+    return `<tr><td><span class="sw" style="background:${IDCOL[w]}"></span>${RNAME[w]}</td><td>${esc(s.status || p.state || '—')}${loop}</td>
+      <td class="mono num">${p.stock != null ? p.stock + ' / ' + CFG.stock : '—'}<br>${p.csi_stock != null ? p.csi_stock + ' / ' + CFG.csi_stock + ' CSI' : ''}</td>
+      <td class="mono num">${p.explored_m != null ? p.explored_m.toFixed(0) + ' m' : '—'}<br>${p.battery != null ? '🔋' + Math.round(100 * p.battery) + '%' : ''}</td>
+      <td>${ut || '<span style="color:var(--text-muted)">—</span>'}<small style="color:var(--text-muted)">${esc(last)}</small></td></tr>`;
+  }).join('');
+}
+function renderCSI() {
+  const box = document.getElementById('tri');
+  const aggs = {};
+  for (const n of S.csi || []) (aggs[n.agg || 0] = aggs[n.agg || 0] || []).push(n);
+  const rows = Object.entries(aggs).map(([a, ns]) => {
+    const b = beaconById(+a);
+    const pres = b ? (b.events || []).filter(e => e.kind === 'presence') : [];
+    const p = ns[0].p || 0;
+    return `<div>${+a ? `<b>B${a}</b> aggregator` : '<b>no beacon in Wi-Fi reach yet</b>'} · nodes ${ns.map(n => 'N' + n.id).join(', ')}
+      · classifier ${confBar(p, CSI)}${pct(p)}${pres.length ? ` · <b style="color:${CSI}">PRESENCE ${pct(pres[pres.length - 1].conf)}</b> (${pres[pres.length - 1].r} m region)` : ''}</div>`;
+  });
+  for (const [f, c] of Object.entries(S.flixCsi || {})) {
+    if (!c || !c.links || !c.links.length) continue;
+    rows.push(`<div><b>${RNAME[f]}</b> flying CSI node · links to ${c.links.map(l => `${l.src} ${l.score.toFixed(2)}`).join(', ')}</div>`);
+  }
+  if (rows.length) box.innerHTML = rows.join('') + `<div style="color:var(--text-muted);margin-top:3px">Wi-Fi sources: relay beacons + Writers · receivers: CSI nodes (+ Flix) · presence = 2 windows ≥ 60 %</div>`;
+}
+const FUSED = {
+  writer: 'encoders · gyro · VO · lidar ICP · gallery lock · own-beacon loop closure · junction re-anchoring',
+  executor: 'encoders · gyro · VO · lidar ICP · gallery lock · beacon fixes',
+  flix: 'gyro · optical flow · ToF (height over floor / water + gallery walls) · beacon fixes · RTK outside',
+};
+function renderRobots() {
+  const cp = S.cp || {};
+  const st = k => k === 'executor' ? cp.executor : KIND[k] === 'flix' ? (cp.flix || {})[k]
+    : ((cp.writers || {})[k] || {}).status;
+  document.getElementById('robots').innerHTML = ['flix_a', 'flix_b', 'writer_a', 'writer_b', 'executor'].map(k => {
+    const p = S.pose[k];
+    return `<tr><td><span class="sw" style="background:var(${RCOL[k]})"></span>${RNAME[k]}</td>
+      <td>${esc(st(k) || (p ? p.state : '—'))}</td>
+      <td class="mono num">${p ? p.err.toFixed(2) + ' m' : '—'}</td>
+      <td class="mono num">${p && p.sigma != null ? p.sigma.toFixed(2) + ' m' : '—'}</td>
+      <td class="mono num">${p && p.battery != null ? Math.round(100 * p.battery) + '%' + (p.charging ? ' ⚡' : '') : '—'}</td>
+      <td style="color:var(--text-muted)">${FUSED[KIND[k]]}</td></tr>`;
+  }).join('');
+}
+function renderONA() {
+  const o = S.ona.B || Object.values(S.ona)[0]; if (!o) return;
+  const n = Object.values(S.ona).reduce((a, q) => a + (q.translated || 0), 0);
+  document.getElementById('vONA1').textContent = o.anchor ?
+    `site anchor ${o.anchor[0].toFixed(6)}, ${o.anchor[1].toFixed(6)} · az ${o.anchor[2].toFixed(0)}° · ${n} packets translated`
+    : 'anchor: site survey';
+  document.getElementById('vONA3').textContent = 'energy ' + ['A', 'B', 'C'].map(l => {
+    const e = (S.ona[l] || {}).energy; return e ? `${l}: ☀${e.solar_w} W 🔋${Math.round(100 * e.soc)}%` : '';
+  }).filter(Boolean).join(' · ');
+}
+const CAMTXT = { intro: 'intro', sweep: 'following Flix B (sweep)', ona: 'ONA-B dish', flooded: 'Flix B over the flooded sump',
+  writers: 'following a Writer', executor: 'following the Executor', event: 'event', rockfall: 'rockfall · beacon self-healing',
+  cutaway: 'MISSION COMPLETE · cutaway' };
+
+// ------------------------------------------------------------------ hover
+cv.addEventListener('mousemove', ev => {
+  const r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  let best = null, bd = 14, kind = null;
+  for (const b of S.beacons) { const d = Math.hypot(X(b.x) - mx, Y(b.y) - my); if (d < bd) { bd = d; best = b; kind = 'b'; } }
+  for (const k of ROBOTS) { const d0 = S.disp[k]; if (!d0) continue; const d = Math.hypot(X(d0.x) - mx, Y(d0.y) - my); if (d < bd) { bd = d; best = k; kind = 'r'; } }
+  const tip = document.getElementById('tip');
+  S.hover = kind === 'b' ? best.id : null;
+  if (!best) { tip.style.display = 'none'; return; }
+  tip.style.display = 'block';
+  tip.style.left = Math.min(mx + 14, r.width - 290) + 'px'; tip.style.top = (my + 14) + 'px';
+  if (kind === 'r') {
+    const p = S.pose[best];
+    const st = p.stats ? Object.entries(p.stats).map(([a, b]) => `${a} ${b}`).join(' · ') : '';
+    tip.innerHTML = `<b>${RNAME[best]}</b> · ${esc(p.state)}${p.note ? ' · ' + esc(p.note) : ''}<br>true (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) m<br>
+      estimate (${p.ex.toFixed(2)}, ${p.ey.toFixed(2)}) m · err ${p.err.toFixed(2)} m · σ ${p.sigma}<br>
+      <span style="color:var(--text-muted)">${FUSED[KIND[best]]}</span>${st ? '<br><span class="mono" style="color:var(--text-muted)">' + esc(st) + '</span>' : ''}`;
+    return;
+  }
+  const jt = best.junction ? '<br>DFS table: ' + Object.entries(best.junction).filter(([k, e]) => e.by !== 'outside')
+    .map(([k, e]) => `${k}° ${e.st}${e.by ? ' (' + (RNAME[e.by] || e.by) + ')' : ''}`).join(' · ') : '';
+  const recs = (best.events || []).map(e => `${e.kind} ${pct(e.conf)} · src ${SRCN[e.src] || e.src} · id ${e.eid}`).join('<br>');
+  tip.innerHTML = `<b>B${best.id}</b> · ${best.btype}${best.owner ? ' · by ' + (RNAME[best.owner] || best.owner) : ''}${best.parent === 0 ? ' (fibre to ONA-' + (best.ona || '?') + ')' : ''}<br>
+    ${recs ? 'stored records:<br>' + recs + '<br>' : ''}${(best.csi_agg || []).length ? 'CSI aggregator of ' + best.csi_agg.map(i => 'N' + i).join(', ') + '<br>' : ''}
+    where to go: toward the miner ${best.next_in ? '→ B' + best.next_in + ` (${best.dist_in} m, ${best.bearing_in}°)` : (best.dist_in ? 'here' : '—')} · toward the exit → ${best.next_out ? 'B' + best.next_out : 'portal'}${jt}<br>
+    parent: ${best.parent === 0 ? 'fiber → ONA' : 'B' + best.parent} · ${best.alive ? (best.routed ? 'routed' : 'NO ROUTE') : 'destroyed'}<br>
+    mapped (${best.mx.toFixed(2)}, ${best.my.toFixed(2)}) m · true (${best.x.toFixed(2)}, ${best.y.toFixed(2)}) m<br>freshness ${(best.fresh * 100).toFixed(0)}%
+    ${best.held ? '<br>' + best.held + ' message(s) held' : ''}${best.relocated ? '<br>relocated (self-healing)' : ''}`;
+});
+cv.addEventListener('mouseleave', () => { S.hover = null; document.getElementById('tip').style.display = 'none'; });
+document.querySelectorAll('#viewSeg button').forEach(bt => bt.addEventListener('click', () => {
+  S.viewMode = bt.dataset.v;
+  document.querySelectorAll('#viewSeg button').forEach(o => o.classList.toggle('on', o === bt));
+  try { localStorage.setItem('lm_view', S.viewMode); } catch (e) { /* storage unavailable */ }
+}));
+
+// ------------------------------------------------------------------ stream
+function handle(msg) {
+  const t = msg.topic, d = msg.data;
+  if (d && typeof d.t === 'number') S.t = Math.max(S.t, d.t);
+  switch (t) {
+    case '/lm/flow': onFlow(d, false); break;
+    case '/lm/flow_replay': onFlow(d, true); break;
+    case '/lm/beacons': S.beacons = d.beacons; S.csi = d.csi || []; S.csiLinks = d.csi_links || []; S.flixCsi = d.flix_csi || {}; break;
+    case '/lm/cp/state': S.cp = d; renderCP(); break;
+    case '/lm/ona/state': S.ona[d.ona || 'B'] = d; renderONA(); break;
+    case '/lm/camera':
+      S.camera = d;
+      document.getElementById('cam').textContent = CAMTXT[d.phase] || d.phase;
+      document.getElementById('caption').innerHTML = d.caption ? `${esc(d.caption)}${d.detail ? '<small>' + esc(d.detail) + '</small>' : ''}` : '';
+      break;
+    default:
+      if (t.startsWith('/lm/pose/')) {
+        const k = t.slice(9); S.pose[k] = d;
+        if (k === 'flix_b' && d.in_c) {
+          const last = S.flixTrack[S.flixTrack.length - 1];
+          if (!last || Math.abs(last[0] - d.x) > 0.5 || Math.abs(last[1] - (d.z || 0)) > 0.1) S.flixTrack.push([d.x, d.z || 0]);
+        }
+        if (k === 'executor') renderSteps();
+        if (KIND[k] === 'writer') renderDFS();
+      }
+    case '/lm/scenario':
+      document.getElementById('scn').textContent = d.name;
+      document.getElementById('scenarioText').textContent = d.text; break;
+  }
+  document.getElementById('simt').textContent = S.t.toFixed(1) + ' s';
+}
+
+function connect() {
+  const es = new EventSource('/events');
+  const c = document.getElementById('conn');
+  es.onopen = () => { c.textContent = 'live'; c.classList.remove('off'); };
+  es.onerror = () => { c.textContent = 'reconnecting…'; c.classList.add('off'); };
+  es.onmessage = ev => { try { handle(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
+}
+
+fetch('/config').then(r => r.json()).then(cfg => {
+  CFG = cfg;
+  if (cfg.ev_names) EVN = Object.fromEntries(Object.entries(cfg.ev_names).map(([k, v]) => [+k, v]));
+  if (cfg.src_name) SRCN = Object.fromEntries(Object.entries(cfg.src_name).map(([k, v]) => [+k, v]));
+  S.flixTrack = [];
+  let lo = { x0: cfg.cp[0] - 8, x1: 146, y0: -68, y1: 58 };
+  SITE = lo;
+  try { const v = localStorage.getItem('lm_view'); if (v === 'site' || v === 'auto') {
+    S.viewMode = v; document.querySelectorAll('#viewSeg button').forEach(o => o.classList.toggle('on', o.dataset.v === v)); } } catch (e) { /* ignore */ }
+  document.getElementById('scn').textContent = cfg.scenario;
+  document.getElementById('scenarioText').textContent = cfg.scenario_text[cfg.scenario] || '';
+  renderSteps(); renderRobots(); renderDFS(); connect(); requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

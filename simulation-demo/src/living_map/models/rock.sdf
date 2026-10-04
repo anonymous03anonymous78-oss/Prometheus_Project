@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="rock">
+    <link name="l">
+      <inertial><mass>12</mass><inertia><ixx>0.3200</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.3200</iyy>
+        <iyz>0</iyz><izz>0.3200</izz></inertia></inertial>
+      <collision name="c"><geometry><box><size>0.420 0.340 0.260</size></box>
+        </geometry></collision>
+      <visual name="v"><geometry><mesh><uri>model://lm_rock/meshes/rock.obj</uri>
+        <scale>1.0 1.0 1.0</scale></mesh></geometry></visual>
+    </link>
+  </model>
+</sdf>

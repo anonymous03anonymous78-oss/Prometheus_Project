@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="pulse_csi_1"><static>true</static><link name="l">
+    <visual name="v"><geometry><cylinder><radius>3.5</radius><length>0.03</length></cylinder></geometry>
+      <material><ambient>0.1 0.8 0.9 1</ambient><diffuse>0.1 0.8 0.9 1</diffuse><specular>0.1 0.1 0.1 1</specular><emissive>0.1 0.8 0.9 1</emissive></material><transparency>0.55</transparency><cast_shadows>false</cast_shadows></visual>
+    <visual name="core"><geometry><sphere><radius>0.25</radius></sphere></geometry>
+      <material><ambient>0.1 0.8 0.9 1</ambient><diffuse>0.1 0.8 0.9 1</diffuse><specular>0.1 0.1 0.1 1</specular><emissive>0.1 0.8 0.9 1</emissive></material><cast_shadows>false</cast_shadows></visual>
+  </link></model>
+</sdf>

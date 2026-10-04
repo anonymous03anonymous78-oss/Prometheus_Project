@@ -1,0 +1,4 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="beam_C"><static>true</static><link name="l"><visual name="leg0"><pose>-43.200 -73.100 51.614 0 0.6735 -2.5385</pose><geometry><cylinder><radius>0.12</radius><length>123.807</length></cylinder></geometry><material><ambient>0.3 0.85 1 1</ambient><diffuse>0.3 0.85 1 1</diffuse><specular>0.1 0.1 0.1 1</specular><emissive>0.3 0.85 1 1</emissive></material><transparency>0.35</transparency><cast_shadows>false</cast_shadows></visual><visual name="leg1"><pose>-57.750 -64.500 51.614 0 2.5148 1.0561</pose><geometry><cylinder><radius>0.12</radius><length>119.483</length></cylinder></geometry><material><ambient>0.3 0.85 1 1</ambient><diffuse>0.3 0.85 1 1</diffuse><specular>0.1 0.1 0.1 1</specular><emissive>0.3 0.85 1 1</emissive></material><transparency>0.35</transparency><cast_shadows>false</cast_shadows></visual></link></model>
+</sdf>

@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="csi_node">
+    <link name="body">
+      <pose>0 0 0.02 0 0 0</pose>
+      <inertial><mass>0.06</mass><inertia><ixx>1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
+        <iyy>1e-5</iyy><iyz>0</iyz><izz>1e-5</izz></inertia></inertial>
+      <collision name="c"><geometry><box><size>0.07 0.05 0.04</size></box></geometry>
+        <surface><contact><collide_bitmask>0x02</collide_bitmask></contact></surface></collision>
+      <visual name="case"><pose>0 0 0 0 0 0</pose><geometry><box><size>0.07 0.05 0.04</size></box></geometry><material><ambient>0.12 0.12 0.14 1</ambient><diffuse>0.12 0.12 0.14 1</diffuse><specular>0.1 0.1 0.1 1</specular></material><cast_shadows>false</cast_shadows></visual>
+      <visual name="band"><pose>0 0 0.021 0 0 0</pose><geometry><box><size>0.072 0.052 0.004</size></box></geometry><material><ambient>0.1 0.8 0.9 1</ambient><diffuse>0.1 0.8 0.9 1</diffuse><specular>0.1 0.1 0.1 1</specular><emissive>0.1 0.8 0.9 1</emissive></material><cast_shadows>false</cast_shadows></visual>
+      <visual name="led"><pose>0.02 0 0.026 0 0 0</pose><geometry><sphere><radius>0.008</radius></sphere>
+        </geometry><material><ambient>0.1 0.8 0.9 1</ambient><diffuse>0.1 0.8 0.9 1</diffuse><specular>0.1 0.1 0.1 1</specular><emissive>0.1 0.8 0.9 1</emissive></material></visual>
+      <visual name="antenna"><pose>-0.025 0 0.07 0 0 0</pose><geometry><cylinder><radius>0.004</radius><length>0.1</length></cylinder></geometry><material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse><specular>0.1 0.1 0.1 1</specular></material><cast_shadows>false</cast_shadows></visual>
+    </link>
+  </model>
+</sdf>

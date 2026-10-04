@@ -1,0 +1,34 @@
+newmtl shiny_panel
+Ka 0.4000 0.4000 0.4000
+Kd 0.4000 0.4000 0.4000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd shiny_panel.png
+
+newmtl foil_silver
+Ka 0.4000 0.4000 0.4000
+Kd 0.4000 0.4000 0.4000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd foil_silver.png
+
+newmtl black_krinkle
+Ka 0.4000 0.4000 0.4000
+Kd 0.0039 0.0039 0.0039
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+
+newmtl tex_02
+Ka 0.4000 0.4000 0.4000
+Kd 0.4000 0.4000 0.4000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd tex_02.png

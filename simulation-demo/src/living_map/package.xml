@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>living_map</name>
+  <version>3.2.0</version>
+  <description>The Living Map - multi-robot spatial memory for GPS-denied emergency zones (frontier/DFS Writers with a utility function, fast-writer drones, Wi-Fi CSI + camera victim detection with fusion, three Outside Network Area stations + mission server) (TSYP14 IEEE RAS x AESS). Phase 1 simulation: Gazebo Fortress + ROS 2 Humble.</description>
+  <maintainer email="anonymous@example.com">Anonymous</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,6 @@
+newmtl dirt
+Ka 0.6 0.6 0.6
+Kd 1.0 1.0 1.0
+Ks 0.05 0.05 0.05
+Ns 5
+map_Kd ../materials/textures/dirt.png

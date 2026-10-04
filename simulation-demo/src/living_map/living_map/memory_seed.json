@@ -1,0 +1,110 @@
+{
+ "missions": [
+  {
+   "utc": 1791187825,
+   "scenario": "false_positive",
+   "onas": [
+    "A",
+    "B",
+    "C"
+   ],
+   "beacon_lost": [],
+   "writer_lost": [],
+   "gas_fp": 1,
+   "gas_real": 1,
+   "victims": [
+    {
+     "x": 49.9,
+     "y": 23.5
+    },
+    {
+     "x": 70.4,
+     "y": -19.5
+    },
+    {
+     "x": 63.8,
+     "y": -60.9
+    },
+    {
+     "x": 133.8,
+     "y": 2.7
+    }
+   ],
+   "exec_speed": 0.687
+  },
+  {
+   "utc": 1791187817,
+   "scenario": "beacon_knockout",
+   "onas": [
+    "A",
+    "B",
+    "C"
+   ],
+   "beacon_lost": [
+    {
+     "x": 23.6,
+     "y": 0.0
+    }
+   ],
+   "writer_lost": [],
+   "gas_fp": 0,
+   "gas_real": 1,
+   "victims": [
+    {
+     "x": 49.9,
+     "y": 23.5
+    },
+    {
+     "x": 70.4,
+     "y": -19.5
+    },
+    {
+     "x": 63.8,
+     "y": -60.7
+    },
+    {
+     "x": 134.0,
+     "y": 1.5
+    }
+   ],
+   "exec_speed": 0.971
+  },
+  {
+   "utc": 1791187949,
+   "scenario": "writer_destroyed",
+   "onas": [
+    "A",
+    "B",
+    "C"
+   ],
+   "beacon_lost": [],
+   "writer_lost": [
+    {
+     "x": 70.3,
+     "y": -22.2
+    }
+   ],
+   "gas_fp": 0,
+   "gas_real": 1,
+   "victims": [
+    {
+     "x": 49.9,
+     "y": 23.5
+    },
+    {
+     "x": 70.4,
+     "y": -19.5
+    },
+    {
+     "x": 63.8,
+     "y": -60.8
+    },
+    {
+     "x": 133.5,
+     "y": 1.5
+    }
+   ],
+   "exec_speed": 0.685
+  }
+ ]
+}

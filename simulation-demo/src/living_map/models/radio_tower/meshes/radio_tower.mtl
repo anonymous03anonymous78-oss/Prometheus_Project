@@ -1,0 +1,8 @@
+newmtl m0
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd radio_tower_diffuse.jpg

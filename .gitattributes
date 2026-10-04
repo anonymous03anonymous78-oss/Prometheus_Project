@@ -1,0 +1,11 @@
+# keep binary files and meshes byte-identical, shell scripts with Unix line endings (Windows/Linux)
+* text=auto
+*.sh text eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.tga binary
+*.stl binary
+*.dae -text
+*.obj -text
+*.mtl -text

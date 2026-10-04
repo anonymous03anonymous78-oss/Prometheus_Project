@@ -1,0 +1,368 @@
+newmtl m0
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd console.png
+
+newmtl m1
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m2
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m3
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m4
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m5
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m6
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m7
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m8
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m9
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m10
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m11
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m12
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m13
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m14
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m15
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m16
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m17
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m18
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m19
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m20
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m21
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m22
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m23
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m24
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m25
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m26
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m27
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m28
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m29
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m30
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m31
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m32
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m33
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m34
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m35
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m36
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m37
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m38
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m39
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
+
+newmtl m40
+Ka 0.6000 0.6000 0.6000
+Kd 1.0000 1.0000 1.0000
+Ks 0.1000 0.1000 0.1000
+Ns 10.0
+d 1.0
+illum 2
+map_Kd light.png
